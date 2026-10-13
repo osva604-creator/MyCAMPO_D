@@ -26,9 +26,10 @@ it('aplica el esquema PostgreSQL, restringe usuarios externos y conserva eventos
     await db.query("insert into public.members (id, name, handle) values ($1, 'Ana', 'Ana')", [member]);
     await db.exec('set role authenticated');
     await db.query("select set_config('request.jwt.claim.sub', $1, false)", [member]);
-    const payload = { id: eventId, caption: 'Molino roto', location: 'Lote 1', status: 'Pendiente', createdAt: new Date().toISOString(), image: `${member}/${eventId}.jpg` };
+    const payload = { id: eventId, caption: 'Molino roto', location: 'Lote 1', status: 'Pendiente', gps: { lat: -34.61, lng: -60.92 }, createdAt: new Date().toISOString(), image: `${member}/${eventId}.jpg` };
     await db.query("insert into public.events (id, actor_id, type, payload, created_at) values ($1, $2, 'post', $3, now())", [eventId, member, JSON.stringify(payload)]);
     expect((await db.query('select * from public.events')).rows).toHaveLength(1);
+    expect((await db.query('select user_id, image_url, caption, latitude, longitude, status from public.events')).rows[0]).toEqual({ user_id: member, image_url: payload.image, caption: 'Molino roto', latitude: -34.61, longitude: -60.92, status: 'Pendiente' });
     await expect(db.query("update public.events set type = 'like'")).rejects.toThrow();
     await expect(db.query('delete from public.events')).rejects.toThrow();
     await db.query("insert into storage.objects values ($1, 'evidence', $2)", [eventId, payload.image]);

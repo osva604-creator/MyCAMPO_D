@@ -1,5 +1,8 @@
 -- Execute once in the SQL editor of a NEW Supabase project.
 -- One deployment/project represents one farm/team. No public signup or public photos.
+-- events conserva operaciones inmutables para la sincronización offline.
+-- Los campos legibles solicitados se derivan de actor_id/payload; no se envían
+-- al insertar. Para cambiar el estado se agrega un evento de tipo 'status'.
 begin;
 create table public.members (
   id uuid primary key references auth.users(id) on delete cascade,
@@ -22,10 +25,25 @@ create table public.events (
   actor_id uuid not null references public.members(id),
   type text not null check (type in ('post', 'comment', 'status', 'like')),
   payload jsonb not null check (jsonb_typeof(payload) = 'object' and octet_length(payload::text) < 100000),
-  created_at timestamptz not null,
+  user_id uuid generated always as (actor_id) stored references public.members(id),
+  -- Ruta privada del bucket evidence, no una URL pública ni firmada que expire.
+  image_url text generated always as (payload->>'image') stored,
+  caption text generated always as (payload->>'caption') stored,
+  latitude double precision generated always as (
+    case when jsonb_typeof(payload #> '{gps,lat}') = 'number'
+    then (payload #>> '{gps,lat}')::double precision end
+  ) stored check (latitude between -90 and 90),
+  longitude double precision generated always as (
+    case when jsonb_typeof(payload #> '{gps,lng}') = 'number'
+    then (payload #>> '{gps,lng}')::double precision end
+  ) stored check (longitude between -180 and 180),
+  status text generated always as (payload->>'status') stored
+    check (status in ('Pendiente', 'En Proceso', 'Resuelto')),
+  created_at timestamptz not null default now(),
   received_at timestamptz not null default now()
 );
 create index events_chronology on public.events(created_at, id);
+create index events_by_member on public.events(user_id);
 create unique index unique_field_post on public.events ((payload->>'id')) where type = 'post';
 alter table public.events enable row level security;
 create policy "Team reads events" on public.events for select to authenticated using (public.is_field_member());

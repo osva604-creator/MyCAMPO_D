@@ -98,6 +98,7 @@ npm run build
 - `src/lib/cloud.js`: sincronización, Storage privado y consulta paginada.
 - `src/lib/useField.js`: estado de la app, cola, reconexión y sincronización periódica.
 - `supabase/schema.sql`: esquema y políticas del backend.
+  `members` contiene id de Auth, name, handle único y active. `events` expone user_id, image_url, caption, latitude, longitude, status y created_at, además de los campos de sincronización. Los primeros seis son columnas generadas desde actor_id/payload: se escriben usando eventos de la app. Cada fila representa una operación; el estado actual de una incidencia se reconstruye desde sus eventos, no actualizando la publicación original. image_url guarda una ruta privada en Storage. El esquema es para proyectos nuevos; si ya está aplicado se necesita una migración ALTER TABLE para incorporar estas columnas.
 - `tests`: persistencia, fusión de cambios, reintentos de sincronización y flujo de interfaz.
 
 La activación del backend y publicación en un hosting son pasos externos pendientes. Las pruebas locales no sustituyen la validación final de dos usuarios contra tu proyecto Supabase.
