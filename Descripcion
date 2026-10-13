@@ -1,0 +1,22 @@
+# Contexto del Proyecto: PWA de Gestión Agropecuaria (Estilo Instagram para el Campo)
+
+## 1. Descripción General
+Estamos creando una Progressive Web App (PWA) móvil-first orientada al sector rural y agropecuario. Su propósito es funcionar como una red social interna de la empresa agropecuaria donde los operarios, agrónomos y encargados puedan registrar incidencias, tareas y anomalías en el campo de forma visual y rápida, inspirada en la interfaz y dinámica de Instagram.
+
+## 2. Características Clave del Producto (MVP)
+- **Feed de Incidencias:** Visualización en formato de publicaciones (tipo feed de Instagram) con fotos, ubicación, estado y autor.
+- **Captura en Campo:** Botón para tomar fotos directamente desde la cámara del dispositivo móvil, extrayendo automáticamente:
+  - Coordenadas geográficas (Latitud y Longitud vía GPS).
+  - Estampa de tiempo (Timestamp).
+- **Epígrafes Descriptivos y Sugerencias:** Campo de texto en cada publicación para describir el problema detectado y sugerir una solución operativa.
+- **Sistema de Menciones (@):** Capacidad de etiquetar con `@` al encargado o responsable directo de resolver la incidencia dentro de la organización.
+- **Hilos de Comentarios:** Sección de comentarios en cada publicación para hacer seguimiento del avance, subir fotos adicionales como evidencia de reparación y cambiar el estado de la incidencia (Pendiente, En Proceso, Resuelto).
+- **Soporte Offline (PWA):** Uso de Service Workers e IndexedDB para permitir la carga de registros en zonas rurales sin conexión a internet, sincronizando los datos automáticamente al recuperar señal.
+
+## 3. Stack Tecnológico Sugerido (A definir/validar en conjunto)
+- **Frontend:** React / Vue.js con Tailwind CSS para una interfaz moderna, limpia y responsive.
+- **Backend / Base de Datos:** Node.js con Supabase o Firebase (para autenticación, base de datos en tiempo real y almacenamiento de imágenes).
+- **APIs del Navegador:** Geolocation API, MediaDevices API (Cámara).
+
+## 4. Objetivo Actual
+Necesito que me ayudes a estructurar la arquitectura inicial del proyecto, definir la estructura de carpetas y escribir el código base para configurar la primera pantalla (la vista del Feed y el componente para crear una nueva publicación con geolocalización y cámara). ¡Comencemos paso a paso por la Fase 1!
