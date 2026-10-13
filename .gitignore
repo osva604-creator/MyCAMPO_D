@@ -1,6 +1,7 @@
 node_modules/
 dist/
 .npm-cache/
+.npm-cache.zip
 .env
 .env.*
 !.env.example
