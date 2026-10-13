@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import { CheckCircle2, ChevronDown, Clock3, Heart, MapPin, MessageCircle, Send, Share2, Wrench } from 'lucide-react';
 import { preparePhoto } from '../lib/media';
+import { mapsUrl } from '../lib/location';
 
 const statuses = {
   Pendiente: { className: 'bg-amber-50 text-amber-800 ring-amber-200', Icon: Clock3 },
@@ -27,6 +28,7 @@ export default function PostCard({ post, actor, onAction }) {
   const status = statuses[post.status] ?? statuses.Pendiente;
   const StatusIcon = status.Icon;
   const location = typeof post.location === 'string' ? post.location : `${post.location.lat}, ${post.location.lng}`;
+  const mapLink = mapsUrl(post.gps);
 
   async function sharePost() {
     const url = new URL(window.location.href);
@@ -73,7 +75,9 @@ export default function PostCard({ post, actor, onAction }) {
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-bold">{post.author.name}</h2>
-          <p className="mt-0.5 flex items-center gap-1 text-xs text-stone-500"><MapPin size={13} className="shrink-0" aria-hidden="true" /><span className="truncate">{location}</span></p>
+          <p className="mt-0.5 truncate text-xs text-stone-500">{location}</p>
+          {mapLink ? <a href={mapLink} target="_blank" rel="noopener noreferrer" aria-label={`Ver en Google Maps: ${location} (abre una nueva pestaña)`} className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-3 text-xs font-semibold text-green-800 transition hover:bg-green-100"><MapPin size={16} aria-hidden="true" />Ver en mapa</a>
+            : <span className="mt-2 inline-flex min-h-11 items-center gap-1.5 text-xs text-stone-400"><MapPin size={16} aria-hidden="true" />Sin coordenadas GPS</span>}
         </div>
         <time dateTime={post.createdAt} className="shrink-0 text-xs text-stone-400">{new Date(post.createdAt).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</time>
       </header>
@@ -96,7 +100,7 @@ export default function PostCard({ post, actor, onAction }) {
         <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-stone-600"><span className="mr-1.5 font-bold text-stone-900">{post.author.name}</span><MentionText text={post.caption} /></p>
         <p role="status" className="text-xs text-green-700">{shareNotice}</p>
         {post.suggestion && <p className="mt-3 rounded-xl bg-green-50 p-3 text-sm text-green-900"><strong>Solución sugerida: </strong><MentionText text={post.suggestion} /></p>}
-        {post.gps && <p className="mt-2 text-xs text-stone-500">GPS: {post.gps.lat.toFixed(6)}, {post.gps.lng.toFixed(6)} · ±{Math.round(post.gps.accuracy)} m</p>}
+        {mapLink && <p className="mt-2 text-xs text-stone-500">GPS: {post.gps.lat.toFixed(6)}, {post.gps.lng.toFixed(6)}{Number.isFinite(post.gps.accuracy) ? ` · ±${Math.round(post.gps.accuracy)} m` : ' · ubicación indicada manualmente'}</p>}
         <label className="mt-3 flex items-center gap-2 text-sm text-stone-600">Estado<select aria-label={`Estado de incidencia de ${post.author.name}`} value={post.status} disabled={busy} onChange={(event) => action('status', { status: event.target.value })} className="min-h-11 rounded-xl border border-stone-200 bg-white px-3">{Object.keys(statuses).map((value) => <option key={value}>{value}</option>)}</select></label>
         <p role="alert" className="mt-2 text-sm text-red-700">{error}</p>
 

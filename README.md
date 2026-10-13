@@ -16,6 +16,7 @@ Sin variables de Supabase funciona en **modo local**, con tres publicaciones ilu
 ## Funciones implementadas
 
 1. Feed con autor, lote, GPS cuando está disponible, fecha, categorías, estados, búsqueda y filtros.
+   El botón **Ver en mapa** abre Google Maps con las coordenadas guardadas. Sin GPS válido se muestra **Sin coordenadas GPS**. Antes de publicar se pueden corregir latitud/longitud, verificar el punto y confirmar que corresponde a la foto; también se puede guardar solo el lote. No se interpreta un nombre de lote ni se extrae GPS EXIF de la galería. Integración basada en [Maps URLs](https://developers.google.com/maps/documentation/urls/get-started).
 2. Captura con cámara trasera (MediaDevices), selector de fotos y compresión JPEG hasta 1600 px. Se guarda la fecha de captura/selección y la de publicación; no se extrae la fecha EXIF de fotos de galería.
 3. GPS automático al abrir el formulario, precisión estimada y reintento. Si se deniega o no hay señal, se permite registrar el lote manualmente.
 4. Problema, solución sugerida y menciones resaltadas. Con Supabase se puede seleccionar un miembro real; las menciones no envían notificaciones push o correo.
