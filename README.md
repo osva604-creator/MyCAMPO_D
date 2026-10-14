@@ -1,5 +1,7 @@
 # MyCAMPO_D
 
+Actualización de despliegue: esquema, SUPER_ADMIN, tres funciones y frontend publicados. Para comenzar las pruebas entrar en https://mycampo-d.conteolab.workers.dev/login y seguir [TESTING.md](./TESTING.md). Ver evidencia y pendientes de correo/Auth en [STAGE_E.md](./STAGE_E.md); la aceptación completa todavía está pendiente. Las referencias siguientes a despliegue pendiente corresponden al diagnóstico anterior.
+
 Estado del 14/10/2026: etapas B/C/D implementadas en el repositorio, con organizaciones, jerarquías, invitaciones, muro, tareas, mensajes y administración. Las tres migraciones están aplicadas en Supabase y el SUPER_ADMIN está inicializado y auditado. Las funciones backend, configuración Auth/SMTP, publicación del frontend y aceptación con cuentas reales siguen pendientes para cerrar Etapa E. Consultar [STAGE_E.md](./STAGE_E.md), [STAGE_D.md](./STAGE_D.md), [AUTH_SETUP.md](./AUTH_SETUP.md) y [backend/README.md](./backend/README.md).
 
 **No ejecutar `supabase/activate-team.sql` ni `supabase/schema.sql` para activar el modelo actual.** Pertenecen al modelo anterior de un único equipo y habilitan accesos incompatibles con las jerarquías nuevas. Las tres migraciones están separadas en `backend/supabase/migrations` y ya se aplicaron con aprobación explícita; no volver a ejecutarlas. Ver el mapeo del historial remoto en STAGE_E.md antes de usar CLI. Los registros y pendientes antiguos se conservan y pueden exportarse; no borrar el almacenamiento del navegador.

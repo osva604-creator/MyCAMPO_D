@@ -1,7 +1,19 @@
 # Etapa E — verificación y despliegue
 
 Fecha: 14/10/2026. Base revisada: `cb7facf`, publicada en `origin/main`.
-Estado actualizado: las tres migraciones se aplicaron al proyecto remoto con aprobación explícita del usuario. La aceptación completa con servicios reales sigue pendiente. No se desplegaron funciones ni enviaron correos.
+Estado actualizado: las tres migraciones, el SUPER_ADMIN, las tres funciones y el frontend están desplegados. Listo para iniciar aceptación con la cuenta existente. La aceptación completa con servicios reales y correo sigue pendiente; no se enviaron correos. Ver [TESTING.md](./TESTING.md).
+
+## Despliegue para iniciar pruebas
+
+Funciones campo-platform, campo-attachment y campo-audit-attachment activas, versión 1. Se desplegaron sus entrypoints, imports, locks y dependencias mediante el conector. La validación de identidad getUser permanece activa en cada endpoint; verify_jwt=false solo deshabilita la validación del gateway.
+
+`_shared/deployment.ts` contiene exclusivamente configuración pública del dominio existente y orígenes exactos (dominio publicado y localhost:5173). CAMPO_APP_URL/CAMPO_ALLOWED_ORIGINS pueden sobrescribirla para otro entorno. Credenciales y claves de servicio siguen proviniendo del entorno protegido de Supabase. Se comprobó que las funciones responden normalmente, sin server_not_configured.
+
+Frontend publicado mediante Wrangler en https://mycampo-d.conteolab.workers.dev. Versión Cloudflare: b4f05c34-7325-469c-a2cf-22d5bd99470a. Rutas /login, /dashboard, /activar-cuenta y /reset-password responden 200 con el bundle actual; esto comprueba el fallback SPA, no una sesión autenticada.
+
+Smoke HTTP remoto: las tres funciones rechazan ausencia de token y token inválido con 401; preflight del dominio permitido devuelve 204 y el origen exacto. Auth settings confirma disable_signup=true, email habilitado y mailer_autoconfirm=false. UI publicada revisada con navegador automatizado a 390 y 1440 px: login visible, redirección de /dashboard sin sesión, cero errores JavaScript y sin desbordamiento horizontal.
+
+Se repitieron 77 tests locales y build, aprobados; Deno check de las tres funciones y lint de ocho archivos aprobados. Pendientes externos: habilitar protección de contraseñas filtradas desde Dashboard, verificar SMTP y redirects, y completar aceptación con cuentas y JWT reales. Los párrafos siguientes conservan el diagnóstico previo a este despliegue y sus hallazgos de rendimiento.
 
 ## Aplicación remota aprobada
 

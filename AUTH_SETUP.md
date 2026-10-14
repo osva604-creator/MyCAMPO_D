@@ -1,5 +1,7 @@
 # Autenticación de MyCAMPO_D
 
+Actualización de despliegue: funciones y frontend publicados; propietario inicializado. Auth remoto confirma altas públicas deshabilitadas y confirmación de correo habilitada. SMTP, callbacks reales y protección de contraseñas filtradas pendientes de verificación/configuración desde Dashboard. Ver [TESTING.md](./TESTING.md) y [STAGE_E.md](./STAGE_E.md); las notas de implementación local posteriores describen etapas previas.
+
 La verificación de Etapa E y el procedimiento de despliegue pendiente están en [STAGE_E.md](./STAGE_E.md).
 
 Actualización de Etapa E: las tres migraciones están aplicadas en el remoto con autorización del usuario y el propietario está inicializado y auditado; las funciones y configuración Auth siguen pendientes. Las referencias siguientes a implementación local describen el estado previo al despliegue del esquema. La protección contra contraseñas filtradas continúa deshabilitada porque esta conexión no permite modificar configuración Auth.

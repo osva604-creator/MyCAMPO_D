@@ -1,5 +1,7 @@
 # Backend multi-organización — Etapas B, C y D
 
+Actualización: esquema y propietario inicializados; tres funciones desplegadas y comprobadas por HTTP. Configuración pública de despliegue en supabase/functions/_shared/deployment.ts, con sobreescrituras opcionales mediante CAMPO_APP_URL/CAMPO_ALLOWED_ORIGINS. Ver ../TESTING.md y ../STAGE_E.md. Las notas siguientes conservan el estado previo al despliegue.
+
 Ver [../STAGE_E.md](../STAGE_E.md) para resultados de verificación, historial remoto existente, orden de despliegue y aceptación pendiente. `verification.sql` contiene comprobaciones de solo lectura posteriores a las migraciones.
 
 Estado: las tres migraciones ya se aplicaron a Supabase con aprobación explícita. Backend e interfaz React integrados localmente; funciones y frontend pendientes de despliegue. Ver versiones remotas, verificaciones y pendientes en [../STAGE_E.md](../STAGE_E.md). Consultar [ADMIN_API.md](./ADMIN_API.md), [APPLICATION_API.md](./APPLICATION_API.md) y [../STAGE_D.md](../STAGE_D.md). Etapa E debe validar Auth, SMTP, Data API, Realtime y concurrencia reales.
