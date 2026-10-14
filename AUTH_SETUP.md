@@ -2,6 +2,8 @@
 
 La verificación de Etapa E y el procedimiento de despliegue pendiente están en [STAGE_E.md](./STAGE_E.md).
 
+Actualización de Etapa E: las tres migraciones están aplicadas en el remoto con autorización del usuario y el propietario está inicializado y auditado; las funciones y configuración Auth siguen pendientes. Las referencias siguientes a implementación local describen el estado previo al despliegue del esquema. La protección contra contraseñas filtradas continúa deshabilitada porque esta conexión no permite modificar configuración Auth.
+
 Se reutiliza el proyecto `kocbcvqhzwpjhewrongf` y el cliente Supabase único de `src/lib/supabase.js`. Las variables existentes no se modificaron:
 
 ```env

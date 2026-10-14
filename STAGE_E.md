@@ -1,7 +1,27 @@
 # Etapa E — verificación y despliegue
 
 Fecha: 14/10/2026. Base revisada: `cb7facf`, publicada en `origin/main`.
-Estado: verificación local y diagnóstico remoto terminados; aceptación con servicios reales pendiente de despliegue autorizado. No se aplicaron migraciones, desplegaron funciones ni enviaron correos durante esta etapa.
+Estado actualizado: las tres migraciones se aplicaron al proyecto remoto con aprobación explícita del usuario. La aceptación completa con servicios reales sigue pendiente. No se desplegaron funciones ni enviaron correos.
+
+## Aplicación remota aprobada
+
+Se preservó la migración remota anterior y se aplicaron los archivos locales completos mediante MCP apply_migration. El servicio asignó estas versiones; no ejecutar db push suponiendo que coinciden con los timestamps locales:
+
+| Archivo local | Versión remota |
+| --- | --- |
+| 20261014143135_multi_organization.sql | 20261014180358 |
+| 20261014152959_administrative_workflows.sql | 20261014180407 |
+| 20261014163341_application_workflows.sql | 20261014180416 |
+
+Verificación posterior: 22 tablas public, las 22 con RLS; bucket campo-private no público, máximo 10485760 bytes y JPEG/PNG/PDF; ocho tablas public en Realtime. Ninguna función SECURITY DEFINER de public/campo_private concede EXECUTE a PUBLIC. La función histórica public.rls_auto_enable mantiene EXECUTE únicamente para postgres y service_role. Sin grants de tablas public para anon ni escritura directa de contenido para authenticated.
+
+Se probaron llamadas SQL con rol authenticated sin identidad: acceso al contexto y operación administrativa rechazados con insufficient_privilege. La prueba se ejecutó en una transacción revertida. Las consultas a contenido devolvieron cero filas, aunque el esquema está vacío y esto todavía no demuestra aislamiento entre organizaciones con datos reales.
+
+Advisors posteriores: seguridad informa protección de contraseñas filtradas deshabilitada y, a nivel informativo, command_results con RLS sin políticas. Este último es intencional: el caché privado solo se usa mediante helpers privilegiados. Rendimiento informa 34 claves foráneas sin índice de cobertura, 10 políticas con llamadas Auth reevaluadas y 25 índices aún sin uso. No se borraron índices de un esquema recién creado ni se modificaron políticas fuera de los archivos aprobados; evaluar estos puntos con carga y planes reales antes de habilitar producción. [Referencia de índices](https://supabase.com/docs/guides/database/database-linter?lint=0001_unindexed_foreign_keys) y [referencia de políticas](https://supabase.com/docs/guides/database/database-linter?lint=0003_auth_rls_initplan).
+
+La protección de contraseñas no pudo activarse desde esta sesión: el conector no ofrece configuración de Auth, no hay navegador conectado y CLI devuelve AccessTokenRequiredError. No se solicitaron ni copiaron tokens al repositorio. Activar en Dashboard → Authentication → configuración de contraseñas, si el plan lo permite, y repetir el advisor para confirmar. No se autorizó ni efectuó un cambio de plan.
+
+El usuario proporcionó explícitamente el UUID Auth del propietario. Se verificó que la cuenta estaba confirmada y no bloqueada; se ejecutó bootstrap-owner.sql con ese UUID dentro de la misma transacción. La verificación posterior confirmó exactamente un propietario activo y un evento owner.bootstrap para su identidad. No se incluye el identificador personal en esta documentación. Están pendientes los secretos CAMPO_APP_URL/CAMPO_ALLOWED_ORIGINS y despliegue de funciones, SMTP, callbacks, frontend y aceptación con cuentas reales. La aprobación de migraciones ya fue recibida y no debe pedirse de nuevo.
 
 ## Evidencia
 
@@ -12,9 +32,9 @@ Estado: verificación local y diagnóstico remoto terminados; aceptación con se
 | `npm.cmd audit --json` | 0 vulnerabilidades reportadas, incluyendo desarrollo |
 | Deno check | Aprobado para las tres funciones con sus respectivos deno.json/lock |
 | Deno lint | Aprobado, 7 archivos |
-| Advisors remoto de rendimiento | Sin avisos |
+| Advisors remoto de rendimiento | Antes de migrar: sin avisos. Después: 34 claves foráneas, 10 políticas Auth y 25 índices sin uso; detalle arriba |
 | Advisor remoto de seguridad | Protección contra contraseñas filtradas deshabilitada |
-| Tablas remotas de public / Edge Functions | Ninguna / ninguna |
+| Tablas remotas de public / Edge Functions | Antes: ninguna / ninguna. Después de migrar: 22 / ninguna |
 
 En PowerShell se usó `npm.cmd` porque la política del sistema bloquea `npm.ps1`; no se cambió la política. Las 14 revisiones visuales de Etapa D siguen documentadas en STAGE_D.md; no se repitieron en esta etapa.
 
