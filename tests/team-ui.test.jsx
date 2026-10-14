@@ -102,6 +102,39 @@ it('requires an explicit audit reason before retrieving message content',async()
 });
 function MemoryAudit(){return <Routes><Route path="/dashboard/admin/*" element={<AdminPanel/>}/></Routes>;}
 
+it('creates an independent team without requiring an organization',async()=>{
+  mock.access={...mock.access,role:'SUPER_ADMIN'};mock.info.workTeams=[];
+  const user=userEvent.setup();scope(<MemoryAudit/>,'/dashboard/admin/equipos');
+  await user.type(screen.getByLabelText('Nombre del equipo'),'Cuadrilla rural');
+  const form=screen.getByRole('heading',{name:'Crear equipo'}).closest('form');
+  await user.type(within(form).getByLabelText('Motivo del cambio'),'Crear cuadrilla independiente');
+  await user.click(within(form).getByRole('button',{name:'Guardar equipo'}));
+  await waitFor(()=>expect(mock.admin).toHaveBeenCalledWith('work_team.create',{
+    name:'Cuadrilla rural',reason:'Crear cuadrilla independiente',
+  },expect.any(String)));
+});
+it('links an existing shared team to a second organization using the organization shortcut',async()=>{
+  mock.access={...mock.access,role:'SUPER_ADMIN'};
+  mock.info.workTeams=[{id:id(8),name:'Cuadrilla rural'}];
+  mock.info.teams[0].work_team_id=id(8);
+  mock.info.organizations.push({id:id(9),name:'Campo B',active:true});
+  const user=userEvent.setup();scope(<MemoryAudit/>,`/dashboard/admin/equipos?organizacion=${id(9)}`);
+  expect(screen.getByLabelText('Organización del vínculo').value).toBe(id(9));
+  await user.selectOptions(screen.getByLabelText('Equipo existente'),id(8));
+  const form=screen.getByRole('heading',{name:'Vincular equipo existente'}).closest('form');
+  await user.type(within(form).getByLabelText('Motivo del cambio'),'Agregar equipo a segundo campo');
+  await user.click(within(form).getByRole('button',{name:'Vincular equipo'}));
+  await waitFor(()=>expect(mock.admin).toHaveBeenCalledWith('team.link',{
+    work_team_id:id(8),organization_id:id(9),reason:'Agregar equipo a segundo campo',
+  },expect.any(String)));
+});
+it('shows the existing team links and the add-teams shortcut on organizations',async()=>{
+  mock.access={...mock.access,role:'SUPER_ADMIN'};
+  scope(<MemoryAudit/>,'/dashboard/admin/organizaciones');
+  expect(screen.getByText('Norte')).toBeTruthy();
+  expect(screen.getByRole('link',{name:'Agregar equipos'}).getAttribute('href')).toBe(`/dashboard/admin/equipos?organizacion=${id(3)}`);
+});
+
 it('fails closed when verification is refused and removes a previously active view',async()=>{
   function Probe(){const access=useAccess();return <><p>{access.status}</p>{access.data?.status==='active'&&<p>Datos privados</p>}<button onClick={access.reload}>Verificar</button></>;}
   const user=userEvent.setup();render(<AccessProvider><Probe/></AccessProvider>);await screen.findByText('Datos privados');

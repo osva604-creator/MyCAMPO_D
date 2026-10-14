@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { NavLink, useParams } from "react-router-dom";
+import { NavLink, useParams, useSearchParams } from "react-router-dom";
 import { useTeam } from "../../context/TeamContext";
 import { supabase } from "../../lib/supabase";
 import { platform, rows } from "../../lib/teamApi";
@@ -84,7 +84,7 @@ export default function AdminPanel() {
           [
             "organizations",
             "organization_members",
-            "teams",
+            "work_teams",
             "posts",
             "tasks",
             "invitation_requests",
@@ -328,6 +328,17 @@ function Organizations({ info, updated }) {
               <p className="mt-1 text-xs text-stone-500">
                 {org.active ? "Activa" : "Deshabilitada"}
               </p>
+              <ul className="mt-2 space-y-1 text-sm text-stone-600">
+                {info.teams.filter((team) => team.organization_id === org.id).map((team) => (
+                  <li key={team.id}>{team.name}{!team.active && " · Vínculo deshabilitado"}</li>
+                ))}
+              </ul>
+              {!info.teams.some((team) => team.organization_id === org.id) && (
+                <p className="mt-2 text-sm text-stone-500">Todavía no tiene equipos vinculados.</p>
+              )}
+              {org.active && <NavLink className="btn-secondary mt-3" to={`/dashboard/admin/equipos?organizacion=${org.id}`}>
+                Agregar equipos
+              </NavLink>}
             </div>
             <button className="btn-secondary" onClick={() => setSelected(org)}>
               Editar organización
@@ -384,125 +395,92 @@ function Organizations({ info, updated }) {
   );
 }
 function Teams({ info, updated }) {
-  const [selected, setSelected] = useState(null),
-    [org, setOrg] = useState("");
-  const mutation = useMutation(async () => {
-    setSelected(null);
-    await updated();
-  });
-  return (
+  const [params] = useSearchParams();
+  const initialOrg = params.get("organizacion") || "";
+  const [selected, setSelected] = useState(null);
+  const [org, setOrg] = useState(initialOrg);
+  const [linkOrg, setLinkOrg] = useState(initialOrg);
+  const [teamId, setTeamId] = useState("");
+  const workTeams = info.workTeams || [];
+  useEffect(() => { setOrg(initialOrg); setLinkOrg(initialOrg); }, [initialOrg]);
+  const mutation = useMutation(async () => { setSelected(null); await updated(); });
+  const linking = useMutation(async () => { setTeamId(""); await updated(); });
+  const available = workTeams.filter(team => !info.teams.some(link =>
+    link.work_team_id === team.id && link.organization_id === linkOrg));
+  const organizationOptions = info.organizations.filter(o => o.active).map(o =>
+    <option key={o.id} value={o.id}>{o.name}</option>);
+  return <div className="space-y-5">
+    <p className="text-sm leading-6 text-stone-600">
+      Creá los equipos de forma independiente y vinculalos a una o varias organizaciones.
+      Cada vínculo mantiene sus propios integrantes, publicaciones y tareas.
+    </p>
     <div className="grid items-start gap-5 lg:grid-cols-2">
-      <div className="space-y-3">
-        {info.teams.map((team) => (
-          <article key={team.id} className="panel">
-            <h2 className="font-bold">{team.name}</h2>
-            <p className="mt-1 text-xs text-stone-500">
-              {
-                info.organizations.find((o) => o.id === team.organization_id)
-                  ?.name
-              }{" "}
-              · {team.active ? "Activo" : "Deshabilitado"}
-            </p>
-            <button
-              className="btn-secondary mt-3"
-              onClick={() => {
-                setSelected(team);
-                setOrg(team.organization_id);
-              }}
-            >
-              Editar equipo
-            </button>
-          </article>
-        ))}
-      </div>
-      <form
-        key={selected?.id || "new"}
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const form = e.currentTarget,
-            f = new FormData(form);
-          const result = await mutation.run(
-            selected ? "team.update" : "team.create",
-            {
-              ...(selected
-                ? { id: selected.id, active: f.get("active") === "on" }
-                : { organization_id: org }),
-              name: String(f.get("name")).trim(),
-              reason: f.get("reason"),
-            },
-            null,
-            true,
-          );
-          if (result) form.reset();
-        }}
-        className="panel space-y-4"
-      >
-        <h2 className="font-bold">
-          {selected ? "Editar equipo" : "Crear equipo"}
-        </h2>
-        {!selected && (
-          <label className="form-label">
-            Organización
-            <select
-              required
-              value={org}
-              onChange={(e) => setOrg(e.target.value)}
-              className="form-input"
-            >
-              <option value="">Seleccionar organización</option>
-              {info.organizations
-                .filter((o) => o.active)
-                .map((o) => (
-                  <option value={o.id} key={o.id}>
-                    {o.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-        )}
-        <label className="form-label">
-          Nombre
-          <input
-            name="name"
-            required
-            maxLength={120}
-            defaultValue={selected?.name}
-            className="form-input"
-          />
+      <form key={selected?.id || "new"} className="panel space-y-4" onSubmit={async event => {
+        event.preventDefault();
+        const form = event.currentTarget, fields = new FormData(form);
+        const result = await mutation.run(selected ? "work_team.update" : "work_team.create", {
+          ...(selected ? {id:selected.id} : org ? {organization_id:org} : {}),
+          name: String(fields.get("name")).trim(), reason:fields.get("reason"),
+        }, null, true);
+        if(result) form.reset();
+      }}>
+        <h2 className="font-bold">{selected ? "Editar nombre del equipo" : "Crear equipo"}</h2>
+        <label className="form-label">Nombre del equipo
+          <input name="name" required maxLength={120} defaultValue={selected?.name} className="form-input" />
         </label>
-        {selected && (
-          <label className="flex min-h-11 items-center gap-2 text-sm">
-            <input
-              name="active"
-              type="checkbox"
-              defaultChecked={selected.active}
-            />
-            Equipo activo
-          </label>
-        )}
-        <p className="text-xs leading-5 text-stone-500">
-          Para deshabilitar un equipo, trasladá antes a sus integrantes y
-          supervisores y cerrá sus invitaciones vigentes.
-        </p>
-        <Reason />
-        <Feedback {...mutation} />
-        <div className="flex gap-3">
-          <button disabled={mutation.busy} className="btn-primary">
-            Guardar equipo
-          </button>
-          {selected && (
-            <button
-              type="button"
-              className="btn-secondary"
-              onClick={() => setSelected(null)}
-            >
-              Nuevo
-            </button>
-          )}
+        {!selected && <label className="form-label">Vincular al crear (opcional)
+          <select value={org} onChange={e=>setOrg(e.target.value)} className="form-input">
+            <option value="">Crear sin organización</option>{organizationOptions}
+          </select>
+        </label>}
+        {selected && <p className="text-sm text-stone-500">El nuevo nombre se aplica en todas las organizaciones vinculadas.</p>}
+        <Reason /><Feedback {...mutation}/>
+        <div className="flex flex-wrap gap-3">
+          <button className="btn-primary" disabled={mutation.busy}>Guardar equipo</button>
+          {selected && <button type="button" className="btn-secondary" onClick={()=>setSelected(null)}>Cancelar edición</button>}
         </div>
       </form>
+      <form className="panel space-y-4" onSubmit={async event => {
+        event.preventDefault();const form=event.currentTarget;
+        const result=await linking.run("team.link",{work_team_id:teamId,organization_id:linkOrg,
+          reason:new FormData(form).get("reason")},null,true);
+        if(result)form.reset();
+      }}>
+        <h2 className="font-bold">Vincular equipo existente</h2>
+        <label className="form-label">Organización del vínculo
+          <select required value={linkOrg} onChange={e=>{setLinkOrg(e.target.value);setTeamId("");}} className="form-input">
+            <option value="">Seleccionar organización</option>{organizationOptions}
+          </select>
+        </label>
+        <label className="form-label">Equipo existente
+          <select required value={teamId} onChange={e=>setTeamId(e.target.value)} className="form-input" disabled={!linkOrg}>
+            <option value="">Seleccionar equipo</option>
+            {available.map(team=><option key={team.id} value={team.id}>{team.name}</option>)}
+          </select>
+        </label>
+        {linkOrg && !available.length && <p className="text-sm text-stone-500">No hay equipos disponibles para agregar. Podés crear uno nuevo.</p>}
+        <Reason /><Feedback {...linking}/>
+        <button className="btn-primary" disabled={linking.busy || !linkOrg || !teamId}>Vincular equipo</button>
+      </form>
     </div>
-  );
+    <div className="grid items-start gap-4 lg:grid-cols-2">
+      {!workTeams.length && <p className="panel text-sm text-stone-500">Todavía no hay equipos creados.</p>}
+      {workTeams.map(team=>{
+        const links=info.teams.filter(link=>link.work_team_id===team.id);
+        return <article className="panel space-y-3" key={team.id}>
+          <h2 className="font-bold">{team.name}</h2>
+          <button className="btn-secondary" onClick={()=>setSelected(team)}>Editar nombre</button>
+          {!links.length && <p className="text-sm text-stone-500">Sin organizaciones vinculadas.</p>}
+          {links.map(link=><div className="space-y-2 rounded-xl border p-3" key={link.id}>
+            <p className="text-sm">{info.organizations.find(o=>o.id===link.organization_id)?.name} · {link.active ? "Vinculado" : "Vínculo deshabilitado"}</p>
+            <ReasonAction label={link.active ? "Deshabilitar vínculo" : "Reactivar vínculo"} action="team.update"
+              payload={{id:link.id,active:!link.active}} after={updated} danger={link.active}/>
+          </div>)}
+        </article>;
+      })}
+    </div>
+    <p className="text-xs text-stone-500">Para deshabilitar un vínculo, trasladá antes sus integrantes y supervisores y cerrá sus invitaciones vigentes. Los demás vínculos del equipo se conservan.</p>
+  </div>;
 }
 function Members({ info, updated }) {
   const [selected, setSelected] = useState(null),
@@ -1269,6 +1247,9 @@ function activityName(action) {
       "organization.create": "Organización creada",
       "organization.update": "Organización actualizada",
       "team.create": "Equipo creado",
+      "work_team.create": "Equipo creado en el catálogo",
+      "work_team.update": "Nombre del equipo actualizado",
+      "team.link": "Equipo vinculado a una organización",
       "team.update": "Equipo actualizado",
       "membership.set": "Membresía asignada",
       "membership.suspend": "Acceso suspendido",

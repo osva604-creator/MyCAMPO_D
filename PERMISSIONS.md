@@ -1,5 +1,7 @@
 # Jerarquías y permisos — propuesta de base de datos
 
+Cambio adicional publicado: catálogo de equipos compartidos y vínculos por organización, descrito en [SHARED_TEAMS.md](./SHARED_TEAMS.md). Solo SUPER_ADMIN administra el catálogo. Compartir la identidad de un equipo no comparte integrantes ni recursos entre organizaciones; la nueva migración se aplicó con aprobación explícita.
+
 La matriz corresponde a las migraciones e interfaz locales de Etapas B/C/D. Las operaciones administrativas, activación y contenido están implementadas localmente, sin despliegue remoto. Consultar [STAGE_D.md](./STAGE_D.md), [backend/ADMIN_API.md](./backend/ADMIN_API.md) y [backend/APPLICATION_API.md](./backend/APPLICATION_API.md). La validación real remota sigue pendiente.
 
 | Recurso o acción | SUPER_ADMIN | GERENTE | ENCARGADO | USUARIO |

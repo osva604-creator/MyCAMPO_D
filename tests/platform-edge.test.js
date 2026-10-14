@@ -2,6 +2,18 @@ import { expect, it, vi } from 'vitest';
 import { createHandler } from '../backend/supabase/functions/_shared/platform';
 
 const uuid = '00000000-0000-4000-8000-000000000001';
+
+it('accepts independent catalog teams and explicit organization links without client actor IDs',async()=>{
+  const f=setup();
+  for(const [action,payload] of [
+    ['work_team.create',{name:'Cuadrilla rural',reason:'Crear equipo independiente'}],
+    ['team.link',{work_team_id:uuid,organization_id:uuid,reason:'Vincular equipo a campo'}],
+  ]){
+    expect((await f.request({action,payload,operation_id:uuid})).status).toBe(200);
+    expect(f.caller.rpc).toHaveBeenLastCalledWith('campo_admin_command',{action,payload,operation_id:uuid});
+    expect((await f.request({action,payload:{...payload,actor_id:uuid},operation_id:uuid})).status).toBe(400);
+  }
+});
 function setup() {
   const caller = {
     auth: { getUser: vi.fn(async () => ({ data: { user: { id:uuid,email_confirmed_at:'2026-01-01',is_anonymous:false } } })) },

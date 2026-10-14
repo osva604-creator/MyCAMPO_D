@@ -8,6 +8,9 @@ export class ApiError extends Error {
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const shapes = {
+  "work_team.create": { name: "name", organization_id: "uuid?", reason: "reason" },
+  "work_team.update": { id: "uuid", name: "name", reason: "reason" },
+  "team.link": { work_team_id: "uuid", organization_id: "uuid", reason: "reason" },
   "organization.create": { name: "name", reason: "reason" },
   "organization.update": {
     id: "uuid",

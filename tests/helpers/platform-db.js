@@ -4,7 +4,7 @@ import { PGlite } from '@electric-sql/pglite';
 export const id = (n) => `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`;
 export const ids = { admin: id(1), manager: id(2), supervisor: id(3), worker: id(4), guest: id(5), other: id(6),
   org: id(10), otherOrg: id(11), team: id(20), team2: id(21), otherTeam: id(22) };
-export async function platformDb({application=false}={}) {
+export async function platformDb({application=false,sharedWorkTeams=false}={}) {
   const db = new PGlite(); const query = (sql, args) => db.query(sql, args);
   await db.exec(`
     create role anon; create role authenticated; create role service_role bypassrls;
@@ -22,6 +22,7 @@ export async function platformDb({application=false}={}) {
   `);
   const migrations=['20261014143135_multi_organization.sql','20261014152959_administrative_workflows.sql'];
   if(application)migrations.push('20261014163341_application_workflows.sql');
+  if(sharedWorkTeams)migrations.push('20261014191345_shared_work_teams.sql');
   for (const migration of migrations) {
     await db.exec(await readFile(new URL(`../../backend/supabase/migrations/${migration}`, import.meta.url), 'utf8'));
   }

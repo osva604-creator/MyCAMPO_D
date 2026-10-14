@@ -56,7 +56,7 @@ export async function allRows(factory) {
 }
 export async function directory(org) {
   const scoped = (query) => (org ? query.eq("organization_id", org) : query);
-  const [people, teams, organizations, assignments, supervisors] =
+  const [people, teams, organizations, assignments, supervisors, workTeams] =
     await Promise.all([
       allRows(() =>
         scoped(
@@ -82,10 +82,12 @@ export async function directory(org) {
           .is("ended_at", null)
           .order("id"),
       ),
+      allRows(() => supabase.from("work_teams").select("id,name").order("id")),
     ]);
   return {
     people,
     teams,
+    workTeams,
     organizations,
     organization: org ? organizations[0] : { name: "Todas las organizaciones" },
     members: people.filter((p) => !p.ended_at),

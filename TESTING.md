@@ -4,6 +4,8 @@ Aplicación: https://mycampo-d.conteolab.workers.dev/login
 
 ## Primera prueba con el propietario
 
+Actualización: el catálogo permite crear equipos sin organización y vincular el mismo equipo a varias. Probar Administración → Organizaciones → Agregar equipos, y luego vincular ese equipo a otra organización. Ver [SHARED_TEAMS.md](./SHARED_TEAMS.md).
+
 1. Abrir el sitio e ingresar con la cuenta existente elegida como SUPER_ADMIN. Si estaba instalada como PWA, cerrar y volver a abrir para actualizarla.
 2. Confirmar que aparece Administración. Crear una organización de prueba y dos equipos identificados como pruebas.
 3. Recargar: la sesión y los registros deben mantenerse. Cerrar sesión: abrir /dashboard debe llevar a /login.

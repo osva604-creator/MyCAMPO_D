@@ -1,5 +1,7 @@
 # Etapa E — verificación y despliegue
 
+Actualización de equipos compartidos: cuarta migración aplicada con aprobación explícita, campo-platform versión 3 y frontend publicados. 86 tests aprobados en 15 archivos. Ver [SHARED_TEAMS.md](./SHARED_TEAMS.md) para mapeo de versiones y aceptación específica; las cifras anteriores de tres migraciones/77 tests son históricas.
+
 Fecha: 14/10/2026. Base revisada: `cb7facf`, publicada en `origin/main`.
 Estado actualizado: las tres migraciones, el SUPER_ADMIN, las tres funciones y el frontend están desplegados. Listo para iniciar aceptación con la cuenta existente. La aceptación completa con servicios reales y correo sigue pendiente; no se enviaron correos. Ver [TESTING.md](./TESTING.md).
 
