@@ -12,3 +12,11 @@ button:disabled { cursor: not-allowed; }
 .mobile-content { padding-bottom: calc(7rem + env(safe-area-inset-bottom)); }
 @media (min-width: 640px) { .mobile-content { padding-bottom: 3rem; } }
 :focus-visible { outline: 3px solid #22c55e; outline-offset: 4px; }
+
+@layer components {
+  .form-label { @apply block text-sm font-semibold text-stone-700; }
+  .form-input { @apply mt-1 w-full min-w-0 rounded-xl border border-stone-200 bg-white p-3 font-normal text-stone-900; }
+  .btn-primary { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-green-800 px-5 py-2 text-sm font-semibold text-white hover:bg-green-900 disabled:opacity-50; }
+  .btn-secondary { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-green-800 hover:bg-green-50 disabled:opacity-50; }
+  .panel { @apply rounded-2xl border border-stone-200 bg-white p-5 shadow-sm; }
+}

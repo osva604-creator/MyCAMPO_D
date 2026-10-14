@@ -1,8 +1,8 @@
 # MyCAMPO_D
 
-Estado verificado el 14/10/2026: frontend actualizado en https://mycampo-d.conteolab.workers.dev/ (Cloudflare, versión `b7fe1e7e-f405-4daa-bee2-4ce92c99c5fc`). El Supabase configurado responde pero su API devuelve `PGRST205` para `members`, `events` y `direct_messages`: la activación del backend sigue pendiente. No se ha confirmado la recuperación de publicaciones anteriores.
+Estado local del 14/10/2026: etapas B/C/D implementadas en el repositorio, con organizaciones, jerarquías, invitaciones, muro, tareas, mensajes y administración. Consultar [STAGE_D.md](./STAGE_D.md), [AUTH_SETUP.md](./AUTH_SETUP.md) y [backend/README.md](./backend/README.md). No se aplicaron migraciones ni se desplegaron estas etapas al sitio remoto desde esta sesión. La validación real de Supabase y despliegue corresponde a Etapa E.
 
-Para ese proyecto sin tablas, ejecutar `supabase/activate-team.sql` desde su SQL Editor. Crea el esquema base y mensajes privados en una transacción, y habilita como miembros a las cuentas Auth existentes con correo confirmado y sin bloqueo vigente. Requiere mantener deshabilitado el registro público y usar un solo proyecto por organización. El script se detiene si detecta tablas existentes. Después, abrir la app en el mismo navegador donde se publicaron los registros y pulsar **Sincronizar ahora**. Los pendientes por cuenta se conservan en IndexedDB; no borrar el almacenamiento del navegador. Las publicaciones del modo local siguen separadas de las cuentas autenticadas.
+**No ejecutar `supabase/activate-team.sql` ni `supabase/schema.sql` para activar el modelo actual.** Pertenecen al modelo anterior de un único equipo y habilitan accesos incompatibles con las jerarquías nuevas. Las tres migraciones propuestas están separadas en `backend/supabase/migrations` y requieren revisión y aprobación antes de ejecutarse remotamente. Los registros y pendientes antiguos se conservan y pueden exportarse; no borrar el almacenamiento del navegador.
 
 PWA de gestión agropecuaria con React, Vite, Tailwind CSS, IndexedDB y Supabase opcional.
 
@@ -29,7 +29,9 @@ Sin variables de Supabase funciona en **modo local**, con tres publicaciones ilu
 7. Backend preparado: acceso con correo/contraseña, directorio de miembros habilitados, eventos y fotos privadas.
 8. Respaldo JSON descargable con fotos incluidas. Es una exportación; esta versión no tiene importador de respaldos.
 
-## Configurar Supabase y habilitar al equipo
+## Configuración anterior de equipo único (histórica; no usar para el modelo actual)
+
+El procedimiento siguiente documenta la versión anterior. Para organizaciones, roles y aprobación centralizada seguir `STAGE_D.md` y `backend/README.md`.
 
 Esta parte requiere que el propietario cree un proyecto; no se han creado recursos de Supabase desde esta sesión.
 

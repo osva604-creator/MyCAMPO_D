@@ -1,0 +1,12 @@
+project_id = "mycampo-d-multi-org"
+
+[functions.campo-platform]
+# Application validates the actual access token with Auth.getUser before dispatching.
+# Supports publishable keys and asymmetric access-token signing.
+verify_jwt = false
+
+[functions.campo-attachment]
+verify_jwt = false
+
+[functions.campo-audit-attachment]
+verify_jwt = false

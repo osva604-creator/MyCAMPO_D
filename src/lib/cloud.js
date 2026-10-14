@@ -1,9 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from './supabase';
 import { asDataUrl } from './media';
 import { mergeRemote, readEvents, saveEvent } from './db';
 
-export const cloud = import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
-  ? createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) : null;
+export const cloud = supabase;
 
 export async function getMembers() {
   const { data, error } = await cloud.from('members').select('id, name, handle').eq('active', true);

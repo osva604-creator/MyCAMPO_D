@@ -4,8 +4,9 @@ import { readEvents, saveEvent } from './db';
 import { createEvent, projectEvents } from './events';
 import { initialPosts } from '../data/demo';
 
-export function useField(user) {
-  const scope = cloud ? user?.id : 'local';
+export function useField(user, { local = false } = {}) {
+  const backend = local ? null : cloud;
+  const scope = backend ? user?.id : 'local';
   const [events, setEvents] = useState([]);
   const [members, setMembers] = useState([]);
   const [ready, setReady] = useState(false);
@@ -16,14 +17,14 @@ export function useField(user) {
   const lock = useRef(false);
   const currentScope = useRef(scope);
   currentScope.current = scope;
-  const actor = cloud ? { id: user?.id, name: members.find((member) => member.id === user?.id)?.name || localStorage.getItem(`field-member-${scope}`) || 'Operario' } : { id: 'local', name: localName.trim() || 'Operario local' };
+  const actor = backend ? { id: user?.id, name: members.find((member) => member.id === user?.id)?.name || localStorage.getItem(`field-member-${scope}`) || 'Operario' } : { id: 'local', name: localName.trim() || 'Operario local' };
   const refresh = useCallback(async () => {
     if (!scope) return;
     const data = await readEvents(scope);
     if (currentScope.current === scope) setEvents(data);
   }, [scope]);
   const sync = useCallback(async () => {
-    if (!cloud || !scope || !navigator.onLine || lock.current) return;
+    if (!backend || !scope || !navigator.onLine || lock.current) return;
     lock.current = true; setBusy(true);
     try {
       const team = await getMembers();
@@ -61,7 +62,7 @@ export function useField(user) {
     catch { throw new Error('No se pudo guardar. Puede faltar espacio en el dispositivo. Conservá la foto e intentá nuevamente.'); }
     sync();
   }
-  return { posts: projectEvents(events, cloud ? [] : initialPosts), ready, online, busy, error, sync, dispatch, actor, members,
+  return { posts: projectEvents(events, backend ? [] : initialPosts), ready, online, busy, error, sync, dispatch, actor, members,
     pending: events.filter((event) => !event.synced).length,
     localName, setLocalName: (name) => { localStorage.setItem('field-name', name); setLocalName(name); } };
 }
