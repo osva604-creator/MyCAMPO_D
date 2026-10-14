@@ -1,4 +1,5 @@
 node_modules/
+.wrangler/
 dist/
 .npm-cache/
 .npm-cache.zip

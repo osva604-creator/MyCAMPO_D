@@ -8,4 +8,7 @@ body { margin: 0; min-width: 320px; background: #f6f8f5; color: #18281d; }
 button, input, textarea { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
+.mobile-nav { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }
+.mobile-content { padding-bottom: calc(7rem + env(safe-area-inset-bottom)); }
+@media (min-width: 640px) { .mobile-content { padding-bottom: 3rem; } }
 :focus-visible { outline: 3px solid #22c55e; outline-offset: 4px; }

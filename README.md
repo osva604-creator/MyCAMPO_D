@@ -1,5 +1,9 @@
 # MyCAMPO_D
 
+Estado verificado el 14/10/2026: frontend actualizado en https://mycampo-d.conteolab.workers.dev/ (Cloudflare, versión `b7fe1e7e-f405-4daa-bee2-4ce92c99c5fc`). El Supabase configurado responde pero su API devuelve `PGRST205` para `members`, `events` y `direct_messages`: la activación del backend sigue pendiente. No se ha confirmado la recuperación de publicaciones anteriores.
+
+Para ese proyecto sin tablas, ejecutar `supabase/activate-team.sql` desde su SQL Editor. Crea el esquema base y mensajes privados en una transacción, y habilita como miembros a las cuentas Auth existentes con correo confirmado y sin bloqueo vigente. Requiere mantener deshabilitado el registro público y usar un solo proyecto por organización. El script se detiene si detecta tablas existentes. Después, abrir la app en el mismo navegador donde se publicaron los registros y pulsar **Sincronizar ahora**. Los pendientes por cuenta se conservan en IndexedDB; no borrar el almacenamiento del navegador. Las publicaciones del modo local siguen separadas de las cuentas autenticadas.
+
 PWA de gestión agropecuaria con React, Vite, Tailwind CSS, IndexedDB y Supabase opcional.
 
 ## Probar en la computadora
@@ -102,3 +106,10 @@ npm run build
 - `tests`: persistencia, fusión de cambios, reintentos de sincronización y flujo de interfaz.
 
 La activación del backend y publicación en un hosting son pasos externos pendientes. Las pruebas locales no sustituyen la validación final de dos usuarios contra tu proyecto Supabase.
+
+
+### Mensajes directos y navegaci?n m?vil
+
+El men? inferior m?vil permite abrir el muro, crear publicaciones, conversar con integrantes activos y acceder a la cuenta. La miniatura usa `avatar_url` o `picture` de los metadatos de la sesi?n, con una inicial como alternativa.
+
+En proyectos existentes y nuevos, ejecutar `supabase/migrations/20261014_direct_messages.sql` en el editor SQL despu?s del esquema base para habilitar los mensajes. Cada proyecto Supabase representa una organizaci?n. Las pol?ticas RLS restringen la lectura a los dos participantes activos y el env?o a integrantes activos. La conversaci?n muestra los ?ltimos 200 mensajes y se actualiza cada 5 segundos mientras est? abierta. Requiere conexi?n; no hay env?o local ni notificaciones de mensajes sin leer.

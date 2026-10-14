@@ -4,11 +4,15 @@ import Navbar from './components/Navbar';
 import PostCard from './components/PostCard';
 import CreatePost from './components/CreatePost';
 import Auth from './components/Auth';
+import MobileNav from './components/MobileNav';
+import Messages from './components/Messages';
 import { cloud } from './lib/cloud';
 import { useField } from './lib/useField';
 
 function Field({ user }) {
   const field = useField(user);
+  const [section, setSection] = useState('home');
+  const avatar = user?.user_metadata?.avatar_url || user?.user_metadata?.picture;
   const [creating, setCreating] = useState(false);
   const [status, setStatus] = useState('Todos');
   const [search, setSearch] = useState('');
@@ -28,19 +32,28 @@ function Field({ user }) {
   }
   return <>
     <Navbar onCreatePost={() => setCreating(true)} />
-    <main id="inicio" className="mx-auto max-w-xl px-3 pb-12 pt-7 sm:px-0">
+    <main id="inicio" className="mobile-content mx-auto max-w-xl px-3 pt-7 sm:px-0">
+      {section === 'messages' && <Messages actor={field.actor} members={field.members} />}
+      {section === 'account' && <section className="mb-5 rounded-2xl border border-stone-200 bg-white p-5"><h1 className="text-2xl font-bold">Tu cuenta</h1><div className="my-4 flex items-center gap-3">{avatar && <img src={avatar} alt="Tu foto de perfil" className="size-14 rounded-full object-cover" />}<div><p className="font-semibold">{field.actor.name}</p><p className="text-sm text-stone-500">{user?.email || 'Cuenta local'}</p></div></div></section>}
+      <div hidden={section !== 'home'}>
       <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-green-700"><Sprout size={15} />La vida en el campo</p>
       <h1 className="mt-2 text-3xl font-bold tracking-tight">Tu campo, conectado.</h1><p className="mt-2 text-sm text-stone-500">Cada recorrida cuenta. Compartí, coordiná y resolvé.</p>
-      <div className="my-5 space-y-3 rounded-2xl border border-stone-200 bg-white p-4 text-sm">
+      </div>
+      <div hidden={section === 'messages'} className="my-5 space-y-3 rounded-2xl border border-stone-200 bg-white p-4 text-sm">
         <p role="status" className="flex items-center gap-2">{!field.online ? <WifiOff size={18} /> : <CloudUpload size={18} />}{!cloud ? 'Modo local · guardado en este dispositivo' : field.busy ? 'Sincronizando…' : `${field.pending} cambios pendientes · ${field.online ? 'Con conexión' : 'Sin conexión'}`}</p>
+        {cloud && field.pending > 0 && <p className="text-sm text-amber-800">Hay cambios guardados en este navegador que todavía no están online. Conservá un respaldo hasta que termine la sincronización.</p>}
         {!cloud && <><p className="text-xs text-stone-500">Los ejemplos son ilustrativos. Configurá Supabase para compartir registros con tu equipo.</p><label className="flex items-center gap-2">Tu nombre<input value={field.localName} maxLength={80} onChange={(event) => field.setLocalName(event.target.value)} className="min-w-0 flex-1 rounded-lg border p-2" /></label></>}
         <div className="flex flex-wrap gap-3">{cloud && <button onClick={field.sync} disabled={field.busy || !field.online} className="min-h-11 text-green-800 disabled:opacity-50">Sincronizar ahora</button>}<button onClick={exportData} className="flex min-h-11 items-center gap-1 text-green-800"><Download size={16} />Exportar respaldo</button>{installPrompt && <button onClick={async () => { await installPrompt.prompt(); setInstallPrompt(null); }} className="min-h-11 text-green-800">Instalar app</button>}{cloud && <button onClick={() => cloud.auth.signOut()} className="flex min-h-11 items-center gap-1"><LogOut size={16} />Salir</button>}</div>
       </div>
       {field.error && <p role="alert" className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{field.error}</p>}
+      {section === 'account' && <section aria-label="Mis publicaciones"><h2 className="mb-4 text-xl font-bold">Mis publicaciones</h2><div className="space-y-6">{field.posts.filter((post) => post.author.id === field.actor.id).map((post) => <PostCard key={post.id} post={post} actor={field.actor} onAction={field.dispatch} />)}{field.ready && !field.posts.some((post) => post.author.id === field.actor.id) && <p className="text-sm text-stone-500">No hay publicaciones de esta cuenta disponibles en este navegador. Si publicaste desde otro dispositivo, abrí allí la app para sincronizarlas.</p>}</div></section>}
+      <div hidden={section !== 'home'}>
       <label className="sr-only" htmlFor="search">Buscar incidencias</label><input id="search" type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar por lote, problema o responsable…" className="mb-3 w-full rounded-xl border border-stone-200 bg-white p-3 text-sm" />
       <div aria-label="Filtrar por estado" className="mb-5 flex flex-wrap gap-2">{['Todos', 'Pendiente', 'En Proceso', 'Resuelto'].map((value) => <button key={value} aria-pressed={status === value} onClick={() => setStatus(value)} className={`min-h-11 rounded-full px-3 text-xs font-semibold ${status === value ? 'bg-green-800 text-white' : 'border border-stone-200 bg-white text-stone-600'}`}>{value}</button>)}</div>
       {!field.ready ? <p role="status">Cargando registros…</p> : <div className="space-y-6">{filtered.map((post) => <PostCard key={post.id} post={post} actor={field.actor} onAction={field.dispatch} />)}{!filtered.length && <p className="py-10 text-center text-stone-500">No hay incidencias para mostrar. Creá una nueva o cambiá los filtros.</p>}</div>}
+      </div>
     </main>
+    <MobileNav section={section} avatar={avatar} name={field.actor.name} onNavigate={(next) => { setSection(next); window.scrollTo({ top: 0 }); }} onCreate={() => setCreating(true)} />
     {creating && <CreatePost onClose={() => setCreating(false)} onPublish={(post) => field.dispatch('post', post)} members={field.members} actor={field.actor} />}
   </>;
 }

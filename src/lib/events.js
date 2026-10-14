@@ -2,8 +2,8 @@
 export function projectEvents(events, seed = []) {
   const posts = new Map(seed.map((post) => [post.id, { ...post, comments: [...post.comments], likedBy: [] }]));
   const ordered = [...events].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
-  for (const { type, payload } of ordered) {
-    if (type === 'post') posts.set(payload.id, { ...payload, comments: [], likedBy: [] });
+  for (const { type, payload, actor } of ordered) {
+    if (type === 'post') posts.set(payload.id, { ...payload, author: { ...payload.author, ...actor }, comments: [], likedBy: [] });
   }
   for (const event of ordered) {
     const { payload, actor, type } = event;

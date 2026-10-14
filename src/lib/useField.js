@@ -34,7 +34,9 @@ export function useField(user) {
       await synchronize(scope, { id: scope }); await refresh();
       if (currentScope.current === scope) setError('');
     } catch (failure) {
-      if (currentScope.current === scope) setError(`No se pudo sincronizar: ${failure.message}. Los registros guardados siguen en este dispositivo.`);
+      if (currentScope.current === scope) setError(failure.code === 'PGRST205'
+        ? 'El espacio online de tu equipo todavía no está habilitado. El administrador debe completar la configuración. Tus registros guardados siguen en este navegador; podés exportar un respaldo.'
+        : `No se pudo sincronizar: ${failure.message}. Los registros guardados siguen en este dispositivo.`);
     } finally { lock.current = false; setBusy(false); }
   }, [scope, refresh]);
   useEffect(() => {

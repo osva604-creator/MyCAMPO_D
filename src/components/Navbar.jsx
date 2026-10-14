@@ -8,7 +8,7 @@ export default function Navbar({ onCreatePost }) {
           <span className="grid size-10 place-items-center rounded-2xl bg-green-800 text-white"><Sprout size={24} aria-hidden="true" /></span>
           <span className="text-xl font-extrabold tracking-tight sm:text-2xl">My<span className="text-green-700">CAMPO_D</span></span>
         </a>
-        <button type="button" onClick={onCreatePost} className="flex min-h-11 items-center gap-2 rounded-full bg-green-800 px-4 text-sm font-semibold text-white transition hover:bg-green-900" aria-label="Tomar foto o crear publicación">
+        <button type="button" onClick={onCreatePost} className="hidden min-h-11 items-center gap-2 rounded-full sm:flex bg-green-800 px-4 text-sm font-semibold text-white transition hover:bg-green-900" aria-label="Tomar foto o crear publicación">
           <Camera size={19} aria-hidden="true" /><span className="hidden sm:inline">Nueva publicación</span>
         </button>
       </nav>

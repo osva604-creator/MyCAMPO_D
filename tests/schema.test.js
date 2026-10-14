@@ -19,6 +19,7 @@ it('aplica el esquema PostgreSQL, restringe usuarios externos y conserva eventos
       grant select, insert, update, delete on storage.objects to authenticated;
     `);
     await db.exec(await readFile(new URL('../supabase/schema.sql', import.meta.url), 'utf8'));
+    await db.exec(await readFile(new URL('../supabase/migrations/20261014_direct_messages.sql', import.meta.url), 'utf8'));
     const member = '00000000-0000-4000-8000-000000000001';
     const outsider = '00000000-0000-4000-8000-000000000002';
     const eventId = '00000000-0000-4000-8000-000000000003';
@@ -39,6 +40,19 @@ it('aplica el esquema PostgreSQL, restringe usuarios externos y conserva eventos
     expect((await db.query('select * from public.events')).rows).toHaveLength(0);
     expect((await db.query('select * from storage.objects')).rows).toHaveLength(0);
     await expect(db.query("insert into public.events (id, actor_id, type, payload, created_at) values ('00000000-0000-4000-8000-000000000004', $1, 'post', $2, now())", [outsider, JSON.stringify(payload)])).rejects.toThrow();
+    await db.exec('reset role');
+    const recipient = '00000000-0000-4000-8000-000000000005';
+    await db.query('insert into auth.users values ($1)', [recipient]);
+    await db.query("insert into public.members (id, name, handle) values ($1, 'Luis', 'Luis')", [recipient]);
+    await db.exec('set role authenticated');
+    await db.query("select set_config('request.jwt.claim.sub', $1, false)", [member]);
+    await db.query('insert into public.direct_messages (sender_id, recipient_id, body) values ($1, $2, $3)', [member, recipient, 'Mensaje privado']);
+    expect((await db.query('select * from public.direct_messages')).rows).toHaveLength(1);
+    await expect(db.query('insert into public.direct_messages (sender_id, recipient_id, body) values ($1, $2, $3)', [recipient, member, 'Suplantacion'])).rejects.toThrow();
+    await db.query("select set_config('request.jwt.claim.sub', $1, false)", [recipient]);
+    expect((await db.query('select * from public.direct_messages')).rows).toHaveLength(1);
+    await db.query("select set_config('request.jwt.claim.sub', $1, false)", [outsider]);
+    expect((await db.query('select * from public.direct_messages')).rows).toHaveLength(0);
     await db.exec('reset role');
     await db.query('update public.members set active = false where id = $1', [member]);
     await db.exec('set role authenticated');

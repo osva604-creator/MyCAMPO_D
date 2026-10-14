@@ -44,3 +44,20 @@ it('crea una incidencia sin GPS, conserva evidencia y estado después de recarga
   expect(screen.getAllByRole('article')).toHaveLength(1);
   expect((await readEvents('local')).filter((event) => event.type === 'post')[0].payload.gps).toBeNull();
 });
+
+
+it('navega desde el men? m?vil al muro, mensajes y cuenta y abre publicaci?n', async () => {
+  const user = userEvent.setup();
+  window.scrollTo = vi.fn();
+  render(<App />);
+  const nav = within(screen.getByRole('navigation', { name: /vil$/ }));
+  await user.click(nav.getByRole('button', { name: 'Mensajes' }));
+  expect(screen.getByRole('heading', { name: 'Mensajes' })).toBeTruthy();
+  expect(screen.getByText(/El modo local no permite mensajes directos/)).toBeTruthy();
+  await user.click(nav.getByRole('button', { name: /de la cuenta$/ }));
+  expect(screen.getByRole('heading', { name: 'Tu cuenta' })).toBeTruthy();
+  await user.click(nav.getByRole('button', { name: 'Inicio' }));
+  expect(screen.getByRole('heading', { name: 'Tu campo, conectado.' })).toBeTruthy();
+  await user.click(nav.getByRole('button', { name: /Nueva publicaci/ }));
+  expect(screen.getByRole('dialog')).toBeTruthy();
+});
