@@ -1,5 +1,7 @@
 # Backend multi-organización — Etapas B, C y D
 
+Ver [../STAGE_E.md](../STAGE_E.md) para resultados de verificación, historial remoto existente, orden de despliegue y aceptación pendiente. `verification.sql` contiene comprobaciones de solo lectura posteriores a las migraciones.
+
 Estado: esquema, RLS, backend e interfaz React integrados localmente. No aplicados ni desplegados a Supabase. Para activar el modelo se requieren las tres migraciones, las tres Edge Functions y el frontend correspondiente, con revisión y aprobación explícita. Consultar [ADMIN_API.md](./ADMIN_API.md), [APPLICATION_API.md](./APPLICATION_API.md) y [../STAGE_D.md](../STAGE_D.md). Etapa E debe validar Auth, SMTP, Data API, Realtime y concurrencia reales.
 
 Este directorio es una raíz CLI separada: `backend/supabase/migrations` no se combina con `supabase/migrations` del repositorio. Las migraciones antiguas pertenecen a la implementación de equipo único. La propuesta se detiene si detecta `members` o `events`; tampoco es una migración de datos para instalaciones existentes.

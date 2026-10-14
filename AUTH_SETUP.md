@@ -1,5 +1,7 @@
 # Autenticación de MyCAMPO_D
 
+La verificación de Etapa E y el procedimiento de despliegue pendiente están en [STAGE_E.md](./STAGE_E.md).
+
 Se reutiliza el proyecto `kocbcvqhzwpjhewrongf` y el cliente Supabase único de `src/lib/supabase.js`. Las variables existentes no se modificaron:
 
 ```env
