@@ -142,7 +142,7 @@ function eligible(info, org, team, access, user) {
     (m) =>
       m.organization_id === org &&
       (access.role === "SUPER_ADMIN" ||
-        access.role === "GERENTE" ||
+        ["GERENTE", "GERENTE_GENERAL"].includes(access.role) ||
         membershipIds.has(m.id)),
   );
 }

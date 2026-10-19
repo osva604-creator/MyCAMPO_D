@@ -94,7 +94,7 @@ export function validate(value, shape) {
       )
     )
       invalid();
-    if (type === "role" && !["GERENTE", "ENCARGADO", "USUARIO"].includes(item))
+    if (type === "role" && !["GERENTE_GENERAL", "GERENTE", "ENCARGADO", "USUARIO"].includes(item))
       invalid();
     if (
       type === "resolution" &&

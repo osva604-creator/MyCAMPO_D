@@ -46,6 +46,21 @@ beforeEach(()=>{
 });
 afterEach(cleanup);
 function gate(path='/dashboard') {return render(<MemoryRouter initialEntries={[path]}><Routes><Route path="/dashboard/*" element={<AccessProvider><TeamGate/></AccessProvider>}/><Route path="/activar-cuenta" element={<AccessProvider><ActivateAccount/></AccessProvider>}/></Routes></MemoryRouter>);}
+
+it('lets a general manager switch between assigned organizations without platform administration',async()=>{
+  mock.access={...mock.access,role:'GERENTE_GENERAL',memberships:[
+    {member_id:id(2),organization_id:id(3),role:'GERENTE_GENERAL',name:'Ana'},
+    {member_id:id(7),organization_id:id(5),role:'GERENTE_GENERAL',name:'Ana'},
+  ]};
+  mock.info.organizations.push({id:id(5),name:'Campo B',active:true},{id:id(99),name:'Unassigned',active:true});
+  const user=userEvent.setup();gate();
+  const selector=await screen.findByRole('combobox',{name:'Organización del panel'});
+  await waitFor(()=>expect(within(selector).getAllByRole('option')).toHaveLength(2));
+  expect(selector.value).toBe(id(3));
+  await user.selectOptions(selector,id(5));
+  expect(selector.value).toBe(id(5));
+  expect(screen.queryByRole('link',{name:'Administración'})).toBeNull();
+});
 function scope(children,path='/dashboard/tareas') {return render(<MemoryRouter initialEntries={[path]}><TeamContext.Provider value={{access:mock.access,user:mock.auth.user,info:mock.info,orgId:id(3),online:true,refreshInfo:vi.fn(async()=>{}),pending:{data:[]},inbox:{data:{conversations:[],unread_total:0}}}}>{children}</TeamContext.Provider></MemoryRouter>);}
 
 it('shows pending approval without mounting the operational dashboard',async()=>{

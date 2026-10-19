@@ -33,7 +33,7 @@ La API `audit_message_page(cid, why, page_before, before_id)` exige superadminis
 
 Los archivos de `campo-private` son privados y solo se consultan si existe metadata vinculada a un recurso autorizado. La metadata se reserva mediante una operación validada y la subida la realiza `campo-attachment`, comprobando identidad, permisos, tamaño, formato y SHA-256 para reintentos. Se aceptan JPEG, PNG y PDF de hasta 10 MiB. No se generan URLs públicas. Los adjuntos de mensajes ajenos tienen un endpoint administrativo separado con registro de acceso por descarga.
 
-Las restricciones diferidas permiten crear o trasladar membresías en una transacción, pero impiden confirmar USUARIO sin exactamente un equipo o ENCARGADO sin equipos supervisados. Cambiar el rol requiere cerrar las asignaciones y membresía anterior y crear una nueva, conservando su historial. La pertenencia única activa se valida por UUID Auth.
+Las restricciones diferidas permiten crear o trasladar membresías en una transacción, pero impiden confirmar USUARIO sin exactamente un equipo o ENCARGADO sin equipos supervisados. Cambiar el rol requiere cerrar las asignaciones y membresía anterior y crear una nueva, conservando su historial. La pertenencia activa se valida por UUID Auth: una organización para GERENTE/ENCARGADO/USUARIO; varias organizaciones asignadas para GERENTE_GENERAL.
 
 ## Procedimiento de propietario, pendiente de ejecución
 
@@ -52,3 +52,7 @@ PGlite ejecuta PostgreSQL y políticas RLS con roles SQL reales; Auth/Storage se
 Las operaciones, paneles y activación están implementados localmente; la entrega con SMTP real y el callback del dominio no se verificaron. Los reclamos evitan envíos concurrentes y exigen revisión explícita de resultados ambiguos; no prometen entrega exactamente una vez. Mantener altas públicas deshabilitadas en Supabase: la UI ya no ofrece registro, pero no modifica ese flag remoto. No enviar invitaciones reales hasta desplegar y validar el flujo aprobado de Etapa E.
 
 Referencias: [RLS](https://supabase.com/docs/guides/database/postgres/row-level-security), [Storage](https://supabase.com/docs/guides/storage/security/access-control).
+
+## Gerente general (publicado el 19/10/2026)
+
+La migración `20261019183114_general_manager.sql` agrega GERENTE_GENERAL, con los permisos de GERENTE dentro de cada organización asignada. El manager de la app asigna cada organización mediante `membership.set`; agregar una segunda conserva la primera. Cambiar a otro rol vuelve a una sola organización. La suspensión afecta todos los accesos de la cuenta. La interfaz incorpora el selector de organizaciones y la Edge Function acepta el nuevo rol. Migración aplicada en remoto como `20261019183652`, `campo-platform` versión 5 y frontend publicados. Evidencia en [../GENERAL_MANAGER.md](../GENERAL_MANAGER.md).

@@ -46,7 +46,7 @@ export function AccessProvider({ children }) {
         throw new Error("No se pudo verificar el acceso a la organización.");
       if (
         data.status === "active" &&
-        (!["SUPER_ADMIN", "GERENTE", "ENCARGADO", "USUARIO"].includes(
+        (!["SUPER_ADMIN", "GERENTE_GENERAL", "GERENTE", "ENCARGADO", "USUARIO"].includes(
           data.role,
         ) ||
           !Array.isArray(data.teams) ||

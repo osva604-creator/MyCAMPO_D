@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 
 export const roleName = {
   SUPER_ADMIN: "Superadministrador",
+  GERENTE_GENERAL: "Gerente general",
   GERENTE: "Gerente",
   ENCARGADO: "Encargado",
   USUARIO: "Usuario",
@@ -156,14 +157,14 @@ export function RoleFields({
           }}
           className="form-input"
         >
-          {["USUARIO", "ENCARGADO", "GERENTE"].map((r) => (
+          {["GERENTE_GENERAL", "GERENTE", "ENCARGADO", "USUARIO"].map((r) => (
             <option key={r} value={r}>
               {roleName[r]}
             </option>
           ))}
         </select>
       </label>
-      {role !== "GERENTE" && (
+      {!["GERENTE", "GERENTE_GENERAL"].includes(role) && (
         <fieldset className="rounded-xl border p-3">
           <legend className="px-1 text-sm font-semibold">
             {role === "USUARIO" ? "Un equipo activo" : "Equipos que supervisa"}

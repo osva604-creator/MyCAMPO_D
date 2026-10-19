@@ -541,7 +541,7 @@ function Members({ info, updated }) {
     <div className="grid items-start gap-5 lg:grid-cols-2">
       <div className="space-y-3">
         <p className="text-sm leading-6 text-stone-500">
-          Un usuario tiene una organización activa. Un encargado puede
+          El gerente general puede pertenecer a varias organizaciones. Los demás roles tienen una organización activa. Un encargado puede
           supervisar varios equipos. Solo el propietario cambia estas
           asignaciones.
         </p>
@@ -560,7 +560,7 @@ function Members({ info, updated }) {
                 Cambiar rol o equipos
               </button>
               <ReasonAction
-                label="Suspender acceso"
+                label="Suspender todos los accesos"
                 action="membership.suspend"
                 payload={{ user_id: member.user_id }}
                 after={updated}
@@ -677,7 +677,7 @@ function Members({ info, updated }) {
         <div className="flex flex-wrap gap-2">
           <button
             disabled={
-              mutation.busy || !account || (role !== "GERENTE" && !teams.length)
+              mutation.busy || !account || (!["GERENTE", "GERENTE_GENERAL"].includes(role) && !teams.length)
             }
             className="btn-primary"
           >
@@ -823,7 +823,7 @@ function Invitations({ data, info, updated }) {
             <Reason label="Motivo de la aprobación" />
             <Feedback {...mutation} />
             <button
-              disabled={mutation.busy || (role !== "GERENTE" && !teams.length)}
+              disabled={mutation.busy || (!["GERENTE", "GERENTE_GENERAL"].includes(role) && !teams.length)}
               className="btn-primary"
             >
               Aprobar ingreso sin enviar todavía

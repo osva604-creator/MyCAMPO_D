@@ -99,7 +99,7 @@ La reconciliación queda auditada. Un resultado tardío del reclamo anterior se 
 
 ## Roles, equipos y bloqueo
 
-`membership.set` acepta solo GERENTE, ENCARGADO o USUARIO. Exige UUID Auth existente, correo confirmado y ausencia de bloqueo vigente. Cierra asignaciones/membresía anteriores y crea las nuevas en una transacción, conservando los recursos históricos.
+`membership.set` acepta GERENTE_GENERAL, GERENTE, ENCARGADO o USUARIO. Exige UUID Auth existente, correo confirmado y ausencia de bloqueo vigente. Para GERENTE_GENERAL conserva las otras organizaciones asignadas y reemplaza solo la membresía de destino (cierra cualquier membresía de otro rol). Para los demás roles cierra todas las membresías anteriores. `membership.suspend` suspende todos los accesos de la cuenta. Conserva los recursos históricos.
 
 Las asignaciones validan organización activa y equipos activos de esa organización. No se puede desactivar un equipo con integrantes, supervisores o invitaciones vigentes: se deben trasladar o cerrar primero. La validación también es un trigger PostgreSQL.
 

@@ -172,12 +172,16 @@ export default function TeamGate() {
 function TeamShell() {
   const auth = useAuth(),
     authorization = useAccess(),
-    access = authorization.data;
+    rawAccess = authorization.data;
+  const multiOrg = rawAccess.role === "GERENTE_GENERAL";
+  const [selectedOrg, setSelectedOrg] = useState("");
+  const membership = rawAccess.memberships?.find(m => m.organization_id === selectedOrg) || rawAccess.memberships?.[0];
+  const access = multiOrg && membership ? { ...rawAccess, ...membership } : rawAccess;
   const owner = access.role === "SUPER_ADMIN";
   const [org, setOrg] = useState(access.organization_id || "");
   const orgId = owner ? org : access.organization_id;
   const infoResource = useResource(
-    useCallback(() => directory(owner ? null : orgId), [owner, orgId]),
+    useCallback(() => directory(owner || multiOrg ? null : orgId), [owner, multiOrg, orgId]),
     { poll: 30000 },
   );
   const info = infoResource.data;
@@ -238,10 +242,12 @@ function TeamShell() {
       )) {
         if (
           fresh.role === "SUPER_ADMIN" ||
-          fresh.organization_id === organization
+          fresh.organization_id === organization ||
+          fresh.memberships?.some(m => m.organization_id === organization)
         ) {
           try {
-            await syncDrafts(fresh, organization);
+            const assigned = fresh.memberships?.find(m => m.organization_id === organization);
+            await syncDrafts(assigned ? { ...fresh, ...assigned } : fresh, organization);
           } catch (error) {
             errors.push(error.message);
           }
@@ -276,7 +282,7 @@ function TeamShell() {
   }
   const unread = Number(inbox.data?.unread_total || 0);
   const links = [
-    { to: "/dashboard", end: true, label: "Muro", Icon: House },
+    { to: "/dashboard", end: true, label: "Inicio", Icon: House },
     { to: "/dashboard/tareas", label: "Tareas", Icon: ClipboardList },
     { to: "/dashboard/mensajes", label: "Mensajes", Icon: MessageCircle },
     { to: "/dashboard/cuenta", label: "Mi cuenta", Icon: UserRound },
@@ -285,7 +291,7 @@ function TeamShell() {
     access,
     user: auth.user,
     orgId,
-    info,
+    info: multiOrg && info ? { ...info, organization: info.organizations.find(o => o.id === orgId) } : info,
     online,
     inbox,
     pending,
@@ -365,7 +371,7 @@ function TeamShell() {
             <p className="text-xs font-semibold uppercase tracking-wider text-green-700">
               {roleName[access.role]}
             </p>
-            {owner ? (
+            {owner || multiOrg ? (
               <label className="sr-only" htmlFor="organization-scope">
                 Organización del panel
               </label>
@@ -375,19 +381,20 @@ function TeamShell() {
               </p>
             )}
           </div>
-          {owner && (
+          {(owner || multiOrg) && (
             <select
               id="organization-scope"
               aria-label="Organización del panel"
               className="max-w-full rounded-xl border border-stone-200 bg-white p-3 text-sm"
-              value={org}
+              value={orgId}
               onChange={(e) => {
-                setOrg(e.target.value);
+                if (multiOrg) setSelectedOrg(e.target.value);
+                else setOrg(e.target.value);
                 setCreating(false);
               }}
             >
-              <option value="">Todas las organizaciones</option>
-              {info?.organizations.map((o) => (
+              {owner && <option value="">Todas las organizaciones</option>}
+              {info?.organizations.filter(o => owner || rawAccess.memberships?.some(m => m.organization_id === o.id)).map((o) => (
                 <option key={o.id} value={o.id}>
                   {o.name}
                   {o.active ? "" : " · deshabilitada"}

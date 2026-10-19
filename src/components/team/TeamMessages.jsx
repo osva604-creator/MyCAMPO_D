@@ -9,7 +9,7 @@ import { useResource } from "../../lib/useResource";
 import { Feedback, PageHeading, ResourceState, date } from "./Common";
 
 export default function TeamMessages() {
-  const { user, access, info, online, inbox } = useTeam();
+  const { user, access, info, online, inbox, orgId } = useTeam();
   const [params, setParams] = useSearchParams();
   const cid = params.get("conversacion") || "";
   const current = useRef(cid);
@@ -105,7 +105,7 @@ export default function TeamMessages() {
         }
       });
   }, [messages.data, user.id, cid, online]);
-  const ownMembership = info.members.find((m) => m.user_id === user.id);
+  const ownMembership = info.members.find((m) => m.user_id === user.id && (!orgId || m.organization_id === orgId));
   const recipients = info.members.filter(
     (m) =>
       m.user_id !== user.id &&
@@ -122,7 +122,7 @@ export default function TeamMessages() {
       (p) => p.user_id === (c.user_a === user.id ? c.user_b : c.user_a),
     )?.name || "Integrante del equipo";
   async function open(recipient_id) {
-    const result = await mutation.run("conversation.open", { recipient_id });
+    const result = await mutation.run("conversation.open", { recipient_id, ...(orgId ? { organization_id: orgId } : {}) });
     if (result) {
       await inbox.reload();
       setParams({ conversacion: result.conversation_id });
