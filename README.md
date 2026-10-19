@@ -1,5 +1,9 @@
 # MyCAMPO_D
 
+Soporte móvil nativo para Android y iPhone: [preparación, GPS en segundo plano y pruebas de campo](MOBILE.md). El control está en **Tu cuenta → Ubicación de campo**. **Seguimiento · Próximamente** queda reservado. Proyectos sincronizados y 124 pruebas automatizadas aprobadas; los binarios y la validación de GPS en teléfonos reales siguen pendientes.
+
+Actualización 19/10/2026: captura offline recuperable, sincronización al reabrir/reconectar, gesto de actualizar, gestión de almacenamiento y cámara a pantalla completa publicados. Ver [OFFLINE_CAPTURE.md](./OFFLINE_CAPTURE.md).
+
 Actualización de despliegue: esquema, SUPER_ADMIN, tres funciones y frontend publicados. Para comenzar las pruebas entrar en https://mycampo-d.conteolab.workers.dev/login y seguir [TESTING.md](./TESTING.md). Ver evidencia y pendientes de correo/Auth en [STAGE_E.md](./STAGE_E.md); la aceptación completa todavía está pendiente. Las referencias siguientes a despliegue pendiente corresponden al diagnóstico anterior.
 
 Estado del 14/10/2026: etapas B/C/D implementadas en el repositorio, con organizaciones, jerarquías, invitaciones, muro, tareas, mensajes y administración. Las tres migraciones están aplicadas en Supabase y el SUPER_ADMIN está inicializado y auditado. Las funciones backend, configuración Auth/SMTP, publicación del frontend y aceptación con cuentas reales siguen pendientes para cerrar Etapa E. Consultar [STAGE_E.md](./STAGE_E.md), [STAGE_D.md](./STAGE_D.md), [AUTH_SETUP.md](./AUTH_SETUP.md) y [backend/README.md](./backend/README.md).
@@ -23,7 +27,7 @@ Sin variables de Supabase funciona en **modo local**, con tres publicaciones ilu
 
 1. Feed con autor, lote, GPS cuando está disponible, fecha, categorías, estados, búsqueda y filtros.
    El botón **Ver en mapa** abre Google Maps con las coordenadas guardadas. Sin GPS válido se muestra **Sin coordenadas GPS**. Antes de publicar se pueden corregir latitud/longitud, verificar el punto y confirmar que corresponde a la foto; también se puede guardar solo el lote. No se interpreta un nombre de lote ni se extrae GPS EXIF de la galería. Integración basada en [Maps URLs](https://developers.google.com/maps/documentation/urls/get-started).
-2. Captura con cámara trasera (MediaDevices), selector de fotos y compresión JPEG hasta 1600 px. Se guarda la fecha de captura/selección y la de publicación; no se extrae la fecha EXIF de fotos de galería.
+2. Captura con cámara trasera (MediaDevices), selector de fotos y compresión JPEG de alta calidad hasta 2560 px, con opción de ahorro a 1600 px. Se guarda la fecha de captura/selección y la de publicación; no se extrae la fecha EXIF de fotos de galería.
 3. GPS automático al abrir el formulario, precisión estimada y reintento. Si se deniega o no hay señal, se permite registrar el lote manualmente.
 4. Problema, solución sugerida y menciones resaltadas. Con Supabase se puede seleccionar un miembro real; las menciones no envían notificaciones push o correo.
 5. Comentarios con texto y/o evidencia fotográfica, Me gusta persistentes y cambios de estado con historial del operario y fecha.

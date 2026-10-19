@@ -1,5 +1,7 @@
 # Etapa E — verificación y despliegue
 
+Actualización de captura offline 19/10/2026: frontend Cloudflare `67e810df-e33a-4dee-afe7-48fd8b12c55c` publicado con GPS al disparar; 114 pruebas en 21 archivos aprobadas y verificación de navegador sobre el dominio publicado con backend simulado. Ver [OFFLINE_CAPTURE.md](./OFFLINE_CAPTURE.md).
+
 Actualización 19/10/2026: gerente general desplegado con aprobación del usuario; migración remota `20261019183652`, campo-platform v5 y frontend Cloudflare `d2212c8c-1761-4efd-bb5a-30f701687da6`. Ver [GENERAL_MANAGER.md](./GENERAL_MANAGER.md).
 
 Actualización de equipos compartidos: cuarta migración aplicada con aprobación explícita, campo-platform versión 3 y frontend publicados. 86 tests aprobados en 15 archivos. Ver [SHARED_TEAMS.md](./SHARED_TEAMS.md) para mapeo de versiones y aceptación específica; las cifras anteriores de tres migraciones/77 tests son históricas.

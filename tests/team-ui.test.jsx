@@ -190,6 +190,20 @@ it('saves an offline team publication as a private draft without contacting the 
   await waitFor(()=>expect(screen.queryByRole('dialog')).toBeNull());
   await screen.findByText('Solo en este dispositivo · pendiente de publicar');expect(mock.execute).not.toHaveBeenCalled();
 });
+it('reopens the team offline with saved directory and allows capture after remount',async()=>{
+  const user=userEvent.setup();
+  mock.auth={...mock.auth,user:{id:id(750),email:'offline@example.com'}};
+  mock.access={...mock.access,user_id:id(750),member_id:id(751),organization_id:id(752),teams:[{id:id(753),name:'Offline team'}]};
+  mock.info={...mock.info,organizations:[{id:id(752),name:'Offline farm',active:true}],teams:[{id:id(753),organization_id:id(752),active:true,name:'Offline team'}],members:[{id:id(751),user_id:id(750),organization_id:id(752),role:'USUARIO',name:'Ana'}]};
+  const view=gate();await screen.findByRole('heading',{name:'Tu campo, conectado.'});
+  view.unmount();
+  Object.defineProperty(navigator,'onLine',{value:false,configurable:true});
+  mock.platform.mockClear();gate();
+  await screen.findByRole('heading',{name:'Tu campo, conectado.'});
+  await user.click(within(screen.getByRole('navigation',{name:'Navegación móvil del equipo'})).getByRole('button',{name:'Nueva publicación',exact:true}));
+  await waitFor(()=>expect(screen.getByLabelText('Problema detectado').closest('fieldset').disabled).toBe(false));
+  expect(mock.platform).not.toHaveBeenCalled();
+});
 it('does not change a password when an invitation cannot be validated for this identity',async()=>{
   mock.access={user_id:id(1),status:'awaiting_approval',invitations:[]};gate(`/activar-cuenta?invitacion=${id(6)}`);
   await screen.findByText(/No pudimos verificar una invitación vigente/);

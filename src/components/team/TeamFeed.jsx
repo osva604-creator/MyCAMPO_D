@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { useTeam, canManage } from "../../context/TeamContext";
 import { feed } from "../../lib/teamApi";
 import { useResource } from "../../lib/useResource";
+import { offlineResource, accessSignature } from '../../lib/offlineStore';
 import { asDataUrl } from "../../lib/media";
 import { downloadJson, revision, saveContentDraft } from "../../lib/teamDrafts";
 import PostCard from "../PostCard";
@@ -18,6 +19,7 @@ export default function TeamFeed({ own = false }) {
     canCreate,
     pending,
     synchronize,
+    online,
   } = useTeam();
   const location = useLocation();
   const [page, setPage] = useState(0),
@@ -34,8 +36,9 @@ export default function TeamFeed({ own = false }) {
   });
   const resource = useResource(
     useCallback(
-      () => feed(orgId || null, info, page, own ? user.id : null, target),
-      [orgId, infoKey, page, own, user.id, target],
+      () => offlineResource(user.id, `feed:${accessSignature(access)}:${orgId || 'all'}:${own}:${page}:${target || ''}`,
+        () => feed(orgId || null, info, page, own ? user.id : null, target), { offline: online === false }),
+      [orgId, infoKey, page, own, user.id, target, accessSignature(access), online],
     ),
     {
       poll: 30000,
@@ -83,8 +86,8 @@ export default function TeamFeed({ own = false }) {
                 source: p.gps_source,
               }
             : null,
-        image: draft.operation.media?.startsWith("data:image/")
-          ? draft.operation.media
+        image: (draft.operation.payload.attachment?.mime_type?.startsWith('image/') || (typeof draft.operation.media === 'string' && draft.operation.media.startsWith('data:image/')))
+          ? draft.mediaUrl || draft.operation.media
           : null,
         imageAlt: p.body,
         suggestion: p.suggestion,
@@ -96,13 +99,13 @@ export default function TeamFeed({ own = false }) {
           (o) => o.id === draft.organization_id,
         )?.name,
         teamName: info.teams.find((t) => t.id === p.team_id)?.name,
-        attachments: draft.operation.media?.startsWith("data:application/pdf")
+        attachments: (draft.operation.payload.attachment?.mime_type === 'application/pdf' || (typeof draft.operation.media === 'string' && draft.operation.media.startsWith('data:application/pdf')))
           ? [
               {
                 id: draft.id,
                 mime_type: "application/pdf",
                 ready: true,
-                url: draft.operation.media,
+                url: draft.mediaUrl || draft.operation.media,
               },
             ]
           : [],
@@ -121,7 +124,7 @@ export default function TeamFeed({ own = false }) {
         text: payload.body,
         author: access.name || "Propietario",
         createdAt: draft.created_at,
-        image: draft.operation.media,
+        image: draft.mediaUrl || draft.operation.media,
         pending: true,
       });
     if (draft.operation.action === "post.status") post.status = payload.status;
@@ -203,7 +206,7 @@ export default function TeamFeed({ own = false }) {
           ),
         })),
       );
-      downloadJson("mycampo-d-publicaciones.json", {
+      await downloadJson("mycampo-d-publicaciones.json", {
         exportedAt: new Date().toISOString(),
         page: page + 1,
         posts,

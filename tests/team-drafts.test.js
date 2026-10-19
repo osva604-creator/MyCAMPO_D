@@ -19,3 +19,18 @@ it('replays the same operation after a transport error without losing its attach
   expect((await drafts(access.user_id,access.organization_id))[0].operation).toEqual(record.operation);
   api.execute.mockResolvedValue({});await syncDrafts(access,access.organization_id);expect(api.execute.mock.calls[1][0].operation_id).toBe(record.operation.operation_id);await removeDraft(record.id);
 });
+it('continues independent queued uploads after one fails and shares concurrent replay attempts',async()=>{
+  api.execute.mockReset();
+  const access={user_id:'draft-user-independent',organization_id:'org-independent',member_id:'same'};
+  const first=await saveContentDraft(access,'post.create',{body:'First'},null,access.organization_id,'First');
+  const second=await saveContentDraft(access,'post.create',{body:'Second'},null,access.organization_id,'Second');
+  let reject;
+  api.execute.mockImplementationOnce(()=>new Promise((_,fail)=>{reject=fail;})).mockResolvedValueOnce({});
+  const a=syncDrafts(access,access.organization_id), b=syncDrafts(access,access.organization_id);
+  expect(a).toBe(b);
+  await new Promise(resolve=>setTimeout(resolve,10));reject(new Error('One attachment failed'));
+  await expect(a).rejects.toThrow('One attachment failed');
+  expect(api.execute).toHaveBeenCalledTimes(2);
+  expect((await drafts(access.user_id,access.organization_id)).map(d=>d.id)).toEqual([first.id]);
+  expect(api.execute.mock.calls[1][0].operation_id).toBe(second.id);
+});

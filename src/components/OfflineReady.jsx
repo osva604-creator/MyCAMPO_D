@@ -1,6 +1,10 @@
 import { useRegisterSW } from 'virtual:pwa-register/react';
+import { isNative } from '../lib/nativeLocation';
 
 export default function OfflineReady() {
+  return isNative() ? null : <WebOfflineReady />;
+}
+function WebOfflineReady() {
   const { offlineReady: [ready, setReady], needRefresh: [refresh, setRefresh], updateServiceWorker } = useRegisterSW();
   if (!ready && !refresh) return null;
   return <aside role="status" className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom))] left-4 right-4 z-50 mx-auto max-w-lg rounded-2xl border border-green-200 bg-white p-4 text-sm shadow-lg sm:bottom-4">

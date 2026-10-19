@@ -13,6 +13,20 @@ button:disabled { cursor: not-allowed; }
 @media (min-width: 640px) { .mobile-content { padding-bottom: 3rem; } }
 :focus-visible { outline: 3px solid #22c55e; outline-offset: 4px; }
 
+.camera-dialog { position: fixed; inset: 0; margin: 0; padding: 0; border: 0; border-radius: 0; width: 100vw; max-width: none; height: 100dvh; max-height: none; overflow: hidden; background: #000; color: #fff; }
+.camera-dialog::backdrop { background: #000; }
+.camera-screen { position: absolute; inset: 0; background: #000; }
+.camera-view { width: 100%; height: 100%; object-fit: cover; }
+.camera-topbar { position: absolute; inset: 0 0 auto; display: flex; align-items: center; justify-content: space-between; padding: max(1rem, env(safe-area-inset-top)) 1rem 2rem; background: linear-gradient(#000b, transparent); }
+.camera-bottom { position: absolute; inset: auto 0 0; padding: 2rem 1rem max(1.5rem, env(safe-area-inset-bottom)); background: linear-gradient(transparent, #000d); }
+.camera-control { display: grid; place-items: center; width: 3rem; height: 3rem; border-radius: 999px; background: #0008; color: white; }
+.camera-shutter { display: grid; place-items: center; width: 5rem; height: 5rem; border: 5px solid white; border-radius: 999px; background: #fff; color: #166534; box-shadow: inset 0 0 0 4px #222; }
+.camera-shutter:disabled { opacity: .5; }
+.capture-return { animation: capture-return .25s ease-out; }
+@keyframes capture-return { from { opacity: .4; transform: translateY(2rem); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .capture-return { animation: none; } }
+.pull-refresh-surface { overscroll-behavior-y: contain; }
+
 @layer components {
   .form-label { @apply block text-sm font-semibold text-stone-700; }
   .form-input { @apply mt-1 w-full min-w-0 rounded-xl border border-stone-200 bg-white p-3 font-normal text-stone-900; }

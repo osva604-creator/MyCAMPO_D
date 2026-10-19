@@ -16,6 +16,9 @@ import { cloud } from "./lib/cloud";
 import { useField } from "./lib/useField";
 import { AccessProvider } from "./context/AccessContext";
 import ActivateAccount from "./components/ActivateAccount";
+import StoragePanel from './components/StoragePanel';
+import LocationPanel from './components/LocationPanel';
+import PullToRefresh from './components/PullToRefresh';
 const TeamGate = lazy(() => import("./components/team/TeamShell"));
 
 function LocalField() {
@@ -91,6 +94,7 @@ function LocalField() {
         id="inicio"
         className="mobile-content mx-auto max-w-xl px-3 pt-7 sm:px-0"
       >
+        <PullToRefresh onRefresh={field.refresh} disabled={creating} refreshing={field.busy}>
         {section === "messages" && (
           <Messages actor={field.actor} members={field.members} />
         )}
@@ -222,6 +226,8 @@ function LocalField() {
             {field.error}
           </p>
         )}
+        {section === "account" && <StoragePanel user="local" pending={0} />}
+        {section === "account" && <LocationPanel />}
         {section === "account" && (
           <section aria-label="Mis publicaciones">
             <h2 className="mb-4 text-xl font-bold">Mis publicaciones</h2>
@@ -297,6 +303,7 @@ function LocalField() {
             </div>
           )}
         </div>
+        </PullToRefresh>
       </main>
       <MobileNav
         section={section}
@@ -314,6 +321,7 @@ function LocalField() {
           onPublish={(post) => field.dispatch("post", post)}
           members={field.members}
           actor={field.actor}
+          draftKey="local:compose"
         />
       )}
     </>

@@ -32,7 +32,7 @@ export function runtime() {
     !appUrl ||
     !valid(appUrl) ||
     !origins.length ||
-    !origins.every(valid) ||
+    !origins.every(origin => origin === 'capacitor://localhost' || valid(origin)) ||
     !origins.includes(appUrl)
   )
     return null;

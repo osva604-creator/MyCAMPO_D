@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import 'fake-indexeddb/auto';
 import React from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { act, cleanup, render, screen } from '@testing-library/react';
@@ -7,6 +8,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import ProtectedRoute from '../src/components/ProtectedRoute';
 import Auth from '../src/components/Auth';
+import { rememberAccess, clearReadCache } from '../src/lib/offlineStore';
 
 const mock = vi.hoisted(() => ({ listener: null, session: null, auth: {} }));
 vi.mock('../src/lib/supabase', () => ({ supabase: { auth: mock.auth } }));
@@ -24,7 +26,7 @@ beforeEach(() => {
   mock.auth.resetPasswordForEmail = vi.fn(async () => ({ data: {} }));
   mock.auth.updateUser = vi.fn(async () => ({ data: {} }));
 });
-afterEach(cleanup);
+afterEach(()=>{cleanup();Object.defineProperty(navigator,'onLine',{value:true,configurable:true});});
 function Panel() {
   const auth = useAuth(); const location = useLocation();
   return <><p>{auth.user.email}</p><p>{location.pathname}</p><button onClick={auth.signOut}>Salir</button></>;
@@ -57,6 +59,13 @@ it('restaura la sesión al montar nuevamente', async () => {
   mock.session = { user: { id: 'one', email: 'test@example.com' } };
   const view = setup(); await screen.findByText('test@example.com');
   view.unmount(); setup(); await screen.findByText('test@example.com');
+});
+it('allows local offline capture from a previously verified identity without refreshing an expired token',async()=>{
+  await rememberAccess({user_id:'offline-auth',status:'active',role:'USUARIO',member_id:'m',organization_id:'o',teams:[],offlineIdentity:{id:'offline-auth',email:'offline-auth@example.com'}});
+  Object.defineProperty(navigator,'onLine',{value:false,configurable:true});
+  setup();await screen.findByText('offline-auth@example.com');
+  expect(mock.auth.getSession).not.toHaveBeenCalled();
+  await clearReadCache('offline-auth');
 });
 it('espera la restauración y prioriza el evento de recuperación sobre el panel', async () => {
   let restore;

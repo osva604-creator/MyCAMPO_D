@@ -1,0 +1,7 @@
+{
+  "appId": "com.conteolab.mycampod",
+  "appName": "MyCAMPO_D",
+  "webDir": "dist",
+  "android": { "useLegacyBridge": true },
+  "loggingBehavior": "none"
+}

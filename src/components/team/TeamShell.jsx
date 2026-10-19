@@ -6,6 +6,7 @@ import {
   LogOut,
   MessageCircle,
   Plus,
+  RefreshCw,
   ShieldCheck,
   Sprout,
   UserRound,
@@ -21,6 +22,7 @@ import { directory, platform, watchTeam } from "../../lib/teamApi";
 import { useResource } from "../../lib/useResource";
 import {
   drafts,
+  draftPreviews,
   downloadJson,
   saveDraft,
   syncDrafts,
@@ -33,6 +35,9 @@ import Tasks from "./Tasks";
 import TeamMessages from "./TeamMessages";
 import TeamAccount from "./TeamAccount";
 import AdminPanel from "./AdminPanel";
+import PullToRefresh from '../PullToRefresh';
+import { offlineResource, accessSignature, protectStorage } from '../../lib/offlineStore';
+import { useSyncLifecycle } from '../../lib/useSyncLifecycle';
 
 function ExitButton() {
   const { signOut } = useAuth();
@@ -178,28 +183,39 @@ function TeamShell() {
   const membership = rawAccess.memberships?.find(m => m.organization_id === selectedOrg) || rawAccess.memberships?.[0];
   const access = multiOrg && membership ? { ...rawAccess, ...membership } : rawAccess;
   const owner = access.role === "SUPER_ADMIN";
+  const online = authorization.status !== 'offline' && !auth.offlineSession && navigator.onLine;
+  const connected = useRef(online);
+  connected.current = online;
+  const activeIdentity = useRef(auth.user.id), session = useRef(auth.session);
+  session.current = auth.session;
+  useEffect(() => {
+    activeIdentity.current = auth.user.id;
+    return () => { activeIdentity.current = null; };
+  }, [auth.user.id]);
   const [org, setOrg] = useState(access.organization_id || "");
   const orgId = owner ? org : access.organization_id;
+  const directoryOrg = owner || multiOrg ? null : orgId;
   const infoResource = useResource(
-    useCallback(() => directory(owner || multiOrg ? null : orgId), [owner, multiOrg, orgId]),
+    useCallback(() => offlineResource(auth.user.id, `directory:${accessSignature(rawAccess)}:${directoryOrg || 'all'}`,
+      () => directory(directoryOrg), { offline: !connected.current }), [directoryOrg, auth.user.id, accessSignature(rawAccess)]),
     { poll: 30000 },
   );
   const info = infoResource.data;
   const inbox = useResource(
-    useCallback(() => platform({ action: "messages.inbox" }), [auth.user.id]),
+    useCallback(() => online ? platform({ action: "messages.inbox" }) : Promise.resolve({ conversations: [], unread_total: 0 }), [auth.user.id, online]),
     { poll: 15000, events: ["messages", "message_reads"] },
   );
   const [creating, setCreating] = useState(false),
     [draftError, setDraftError] = useState(""),
     [syncing, setSyncing] = useState(false);
-  const syncLock = useRef(false);
+  const [lastSync, setLastSync] = useState(null);
+  const syncLock = useRef(null);
   const pending = useResource(
     useCallback(
-      () => drafts(auth.user.id, orgId || null),
+      () => draftPreviews(auth.user.id, orgId || null),
       [auth.user.id, orgId],
     ),
   );
-  const online = authorization.status !== "offline" && navigator.onLine;
   const canCreate = Boolean(
     orgId &&
     info?.organizations.find((o) => o.id === orgId)?.active &&
@@ -224,18 +240,20 @@ function TeamShell() {
       ),
     [auth.user.id],
   );
-  async function synchronize() {
-    if (syncLock.current || !navigator.onLine) return;
-    syncLock.current = true;
+  function synchronize() {
+    if (syncLock.current) return syncLock.current;
+    if (!navigator.onLine) return Promise.resolve(false);
+    const run = async () => {
     setSyncing(true);
     setDraftError("");
     try {
       const fresh = await authorization.reload();
+      if (activeIdentity.current !== auth.user.id) return false;
       if (fresh?.status !== "active")
         throw new Error(
           "No se pudo verificar la membresía. Los borradores siguen guardados.",
         );
-      const ownDrafts = await drafts(auth.user.id, orgId || null);
+      const ownDrafts = await drafts(auth.user.id, null);
       const errors = [];
       for (const organization of new Set(
         ownDrafts.map((d) => d.organization_id),
@@ -247,7 +265,10 @@ function TeamShell() {
         ) {
           try {
             const assigned = fresh.memberships?.find(m => m.organization_id === organization);
-            await syncDrafts(assigned ? { ...fresh, ...assigned } : fresh, organization);
+            await syncDrafts(assigned ? { ...fresh, ...assigned } : fresh, organization, {
+              token: session.current?.access_token,
+              isCurrent: () => activeIdentity.current === auth.user.id,
+            });
           } catch (error) {
             errors.push(error.message);
           }
@@ -257,28 +278,27 @@ function TeamShell() {
         new CustomEvent("mycampo-d:team-change", { detail: {} }),
       );
       await pending.reload();
-      if (errors.length) setDraftError(errors.join(" "));
+      await Promise.all([infoResource.reload(), inbox.reload()]);
+      if (errors.length) { setDraftError(errors.join(" ")); return false; }
+      setLastSync(new Date());
+      return true;
     } catch (error) {
       setDraftError(error.message);
+      return false;
     } finally {
-      syncLock.current = false;
+      syncLock.current = null;
       setSyncing(false);
     }
+    };
+    syncLock.current = run();
+    return syncLock.current;
   }
-  useEffect(() => {
-    if (online) {
-      synchronize();
-    }
-    const timer = setInterval(() => {
-      if (navigator.onLine) synchronize();
-    }, 30000);
-    return () => clearInterval(timer);
-    // Scope changes remount resources; backend validates every replay independently.
-  }, [orgId, access.member_id, online]);
+  useSyncLifecycle(synchronize);
   async function publish(post) {
     await saveDraft(access, post, orgId, post.teamId);
     await pending.reload();
-    if (navigator.onLine) await synchronize();
+    protectStorage();
+    if (navigator.onLine) void synchronize();
   }
   const unread = Number(inbox.data?.unread_total || 0);
   const links = [
@@ -296,6 +316,8 @@ function TeamShell() {
     inbox,
     pending,
     synchronize,
+    syncing,
+    lastSync,
     canCreate,
     openCreate: () => {
       if (canCreate) setCreating(true);
@@ -315,6 +337,12 @@ function TeamShell() {
             </span>
           </Link>
           <div className="flex items-center gap-2">
+            <span className="hidden max-w-48 truncate text-xs text-stone-500 lg:block" title={auth.user.email}>{auth.user.email}</span>
+            <button aria-label="Sincronizar ahora" title={lastSync ? `Última sincronización: ${lastSync.toLocaleTimeString('es-AR')}` : 'Sincronizar publicaciones'}
+              disabled={!online || syncing} onClick={synchronize} className="btn-secondary hidden sm:inline-flex">
+              <RefreshCw size={17} className={syncing ? 'animate-spin' : ''} />
+              {syncing ? 'Sincronizando…' : 'Sincronizar'}
+            </button>
             <Link
               to="/dashboard/notificaciones"
               aria-label={`Notificaciones${unread ? `, ${unread} mensajes sin leer` : ""}`}
@@ -366,6 +394,7 @@ function TeamShell() {
         </nav>
       </header>
       <main className="mobile-content mx-auto max-w-6xl px-4 pt-6">
+        <PullToRefresh onRefresh={synchronize} refreshing={syncing} disabled={!online || creating}>
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider text-green-700">
@@ -424,8 +453,8 @@ function TeamShell() {
             role="status"
             className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900"
           >
-            Estás viendo lo cargado en esta sesión. Las nuevas publicaciones se
-            guardan como borradores hasta verificar los permisos online.
+            Sin conexión: podés capturar y guardar publicaciones en este dispositivo.
+            Los pendientes se enviarán al volver a conectarte. Se muestran las publicaciones descargadas.
           </p>
         )}
         {draftError && (
@@ -464,6 +493,7 @@ function TeamShell() {
             </Routes>
           </div>
         )}
+        </PullToRefresh>
       </main>
       <nav
         aria-label="Navegación móvil del equipo"
@@ -519,6 +549,7 @@ function TeamShell() {
           )}
           requirePhoto={false}
           allowAttachments
+          draftKey={`team:${auth.user.id}:${orgId}:${access.member_id || access.role}`}
           onPublish={publish}
           onClose={() => setCreating(false)}
         />

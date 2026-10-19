@@ -7,12 +7,14 @@ export function apiError(error) {
   );
   failure.code = error?.code;
   failure.status = error?.status;
+  failure.connection = error?.connection === true;
   return failure;
 }
-export async function platform(body) {
+export async function platform(body, { token = null } = {}) {
   if (!supabase) throw new Error("El modo equipo no está configurado.");
   const { data, error } = await supabase.functions.invoke("campo-platform", {
     body,
+    ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
   });
   if (error) {
     let detail;
@@ -24,6 +26,7 @@ export async function platform(body) {
     throw apiError({
       code: detail?.error,
       status: error.context?.status,
+      connection: !error.context && /fetch|network|relay/i.test(error.name || error.message || ''),
       message:
         detail?.message ||
         "No se pudo conectar con el equipo. El administrador debe verificar la configuración online.",
@@ -39,6 +42,7 @@ export async function rows(query) {
   if (error)
     throw apiError({
       code: error.code,
+      connection: !error.code && /fetch|network/i.test(error.message || ''),
       message:
         error.code === "42501"
           ? "No tenés acceso a estos datos."
@@ -298,6 +302,11 @@ export async function conversationMessages(cid, page = 0) {
 }
 export function mediaBlob(source) {
   if (!source) return null;
+  if (source instanceof Blob) {
+    if (!['image/jpeg', 'image/png', 'application/pdf'].includes(source.type) || !source.size || source.size > 10485760)
+      throw new Error('Usá un archivo JPG, PNG o PDF de hasta 10 MB.');
+    return source;
+  }
   const match =
     /^data:(image\/jpeg|image\/png|application\/pdf);base64,([A-Za-z0-9+/=]+)$/.exec(
       source,
@@ -326,16 +335,18 @@ export function contentOperation(action, payload, media = null) {
           }
         : {}),
     },
-    media,
+    media: blob,
   };
 }
-export async function executeContent(operation) {
+export async function executeContent(operation, { token = null, isCurrent = () => true } = {}) {
+  if (!isCurrent()) throw new Error('Cambió la sesión. El pendiente se conserva en el dispositivo.');
   const result = await platform({
     action: "content.command",
     content_action: operation.action,
     payload: operation.payload,
     operation_id: operation.operation_id,
-  });
+  }, { token });
+  if (!isCurrent()) throw new Error('Cambió la sesión. El pendiente se conserva para confirmar su subida.');
   if (operation.media) {
     const blob = mediaBlob(operation.media);
     const { data, error } = await supabase.functions.invoke(
@@ -343,6 +354,7 @@ export async function executeContent(operation) {
       {
         body: blob,
         headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           "x-attachment-id": operation.payload.attachment.id,
           "Content-Type": blob.type,
         },

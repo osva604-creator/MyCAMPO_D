@@ -3,5 +3,5 @@
 // Credentials always come from the managed function environment.
 export const deployment = {
   appUrl: "https://mycampo-d.conteolab.workers.dev",
-  allowedOrigins: "https://mycampo-d.conteolab.workers.dev,http://localhost:5173",
+  allowedOrigins: "https://mycampo-d.conteolab.workers.dev,http://localhost:5173,https://localhost,capacitor://localhost",
 };

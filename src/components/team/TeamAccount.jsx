@@ -8,6 +8,8 @@ import { useResource } from "../../lib/useResource";
 import { downloadJson, removeDraft, revision } from "../../lib/teamDrafts";
 import { exportLegacy } from "../../lib/teamDrafts";
 import TeamFeed from "./TeamFeed";
+import StoragePanel from '../StoragePanel';
+import LocationPanel from '../LocationPanel';
 import { Feedback, PageHeading, ResourceState, date, roleName } from "./Common";
 
 export default function TeamAccount() {
@@ -144,6 +146,8 @@ export default function TeamAccount() {
             )}
           </div>
         </div>
+        <StoragePanel user={user.id} pending={pending.data?.length || 0} />
+        <LocationPanel />
         <section className="panel mt-5">
           <h2 className="text-lg font-bold">Solicitar una invitación</h2>
           <p className="mt-2 text-sm leading-6 text-stone-500">

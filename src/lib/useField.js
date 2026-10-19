@@ -3,6 +3,8 @@ import { cloud, getMembers, synchronize } from './cloud';
 import { readEvents, saveEvent } from './db';
 import { createEvent, projectEvents } from './events';
 import { initialPosts } from '../data/demo';
+import { useSyncLifecycle } from './useSyncLifecycle';
+import { saveLocally, protectStorage } from './offlineStore';
 
 export function useField(user, { local = false } = {}) {
   const backend = local ? null : cloud;
@@ -40,6 +42,7 @@ export function useField(user, { local = false } = {}) {
         : `No se pudo sincronizar: ${failure.message}. Los registros guardados siguen en este dispositivo.`);
     } finally { lock.current = false; setBusy(false); }
   }, [scope, refresh]);
+  useSyncLifecycle(sync, Boolean(backend));
   useEffect(() => {
     setReady(false); setEvents([]); setMembers([]); setError('');
     if (!scope) return;
@@ -52,17 +55,16 @@ export function useField(user, { local = false } = {}) {
     const disconnect = () => setOnline(false);
     const focus = () => { refresh().catch(() => {}); sync(); };
     window.addEventListener('online', reconnect); window.addEventListener('offline', disconnect); window.addEventListener('focus', focus);
-    const interval = setInterval(sync, 30000);
-    return () => { window.removeEventListener('online', reconnect); window.removeEventListener('offline', disconnect); window.removeEventListener('focus', focus); clearInterval(interval); };
+    return () => { window.removeEventListener('online', reconnect); window.removeEventListener('offline', disconnect); window.removeEventListener('focus', focus); };
   }, [sync, refresh]);
   async function dispatch(type, payload) {
     if (!ready || !scope) throw new Error('Esperá a que termine la carga del almacenamiento.');
     const event = createEvent(type, payload, actor);
-    try { await saveEvent(scope, event); await refresh(); }
+    try { await saveLocally(() => saveEvent(scope, event)); await refresh(); void protectStorage(); }
     catch { throw new Error('No se pudo guardar. Puede faltar espacio en el dispositivo. Conservá la foto e intentá nuevamente.'); }
     sync();
   }
   return { posts: projectEvents(events, backend ? [] : initialPosts), ready, online, busy, error, sync, dispatch, actor, members,
     pending: events.filter((event) => !event.synced).length,
-    localName, setLocalName: (name) => { localStorage.setItem('field-name', name); setLocalName(name); } };
+    refresh, localName, setLocalName: (name) => { localStorage.setItem('field-name', name); setLocalName(name); } };
 }

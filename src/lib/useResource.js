@@ -10,6 +10,7 @@ export function useResource(loader, { poll = 0, events = [] } = {}) {
   const dataLoader = useRef(null);
   const eventKey = events.join(",");
   const reload = useCallback(async () => {
+    if (!mounted.current) return null;
     const current = ++sequence.current;
     setBusy(true);
     try {

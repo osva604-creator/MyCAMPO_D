@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="capacitor_background_geolocation_notification_channel_name">Ubicación de campo</string>
+    <string name="capacitor_background_geolocation_notification_icon">drawable/ic_tracking</string>
+    <string name="app_name">MyCAMPO_D</string>
+    <string name="title_activity_main">MyCAMPO_D</string>
+    <string name="package_name">com.conteolab.mycampod</string>
+    <string name="custom_url_scheme">com.conteolab.mycampod</string>
+</resources>
