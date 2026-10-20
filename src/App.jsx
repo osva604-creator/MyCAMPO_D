@@ -20,6 +20,7 @@ import StoragePanel from './components/StoragePanel';
 import LocationPanel from './components/LocationPanel';
 import PullToRefresh from './components/PullToRefresh';
 const TeamGate = lazy(() => import("./components/team/TeamShell"));
+const LocalMap = lazy(() => import('./components/map/MapPage'));
 
 function LocalField() {
   const user = null;
@@ -89,12 +90,13 @@ function LocalField() {
   }
   return (
     <>
-      <Navbar onCreatePost={() => setCreating(true)} />
+      <Navbar onCreatePost={() => setCreating(true)} onMap={() => setSection('map')} />
       <main
         id="inicio"
-        className="mobile-content mx-auto max-w-xl px-3 pt-7 sm:px-0"
+        className={`mobile-content mx-auto px-3 pt-7 ${section === 'map' ? 'max-w-6xl sm:px-4' : 'max-w-xl sm:px-0'}`}
       >
         <PullToRefresh onRefresh={field.refresh} disabled={creating} refreshing={field.busy}>
+        {section === 'map' && <Suspense fallback={<p role="status">Abriendo mapa…</p>}><LocalMap posts={field.posts} actor={field.actor} onOpenPost={id=>{setSection('home');window.location.hash=`publicacion-${id}`;setTimeout(()=>document.getElementById(`publicacion-${id}`)?.scrollIntoView?.(),0);}}/></Suspense>}
         {section === "messages" && (
           <Messages actor={field.actor} members={field.members} />
         )}
@@ -131,7 +133,7 @@ function LocalField() {
           </p>
         </div>
         <div
-          hidden={section === "messages"}
+          hidden={section === "messages" || section === 'map'}
           className="my-5 space-y-3 rounded-2xl border border-stone-200 bg-white p-4 text-sm"
         >
           <p role="status" className="flex items-center gap-2">
@@ -227,7 +229,7 @@ function LocalField() {
           </p>
         )}
         {section === "account" && <StoragePanel user="local" pending={0} />}
-        {section === "account" && <LocationPanel />}
+        {section === "account" && <LocationPanel onOpenMap={() => setSection('map')} />}
         {section === "account" && (
           <section aria-label="Mis publicaciones">
             <h2 className="mb-4 text-xl font-bold">Mis publicaciones</h2>

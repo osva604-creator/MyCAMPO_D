@@ -2,6 +2,7 @@
   "appId": "com.conteolab.mycampod",
   "appName": "MyCAMPO_D",
   "webDir": "dist",
+  "appendUserAgent": "MyCAMPO_D/0.1 (+https://mycampo-d.conteolab.workers.dev)",
   "android": { "useLegacyBridge": true },
   "loggingBehavior": "none"
 }

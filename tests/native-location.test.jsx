@@ -61,9 +61,9 @@ it('rejects invalid or missing device coordinates instead of fabricating a GPS f
   for (const coords of [{ latitude: 91, longitude: 0, accuracy: 1 }, { latitude: 0, longitude: 0, accuracy: -1 }, { latitude: 0, longitude: NaN, accuracy: 1 }])
     expect(() => normalizeFix(coords, Date.now())).toThrow(/válida/);
 });
-it('keeps tracking reserved and background GPS unavailable in the website', async () => {
+it('links foreground route recording to Mapa and keeps background GPS unavailable in the website', async () => {
   mock.native = false; render(<LocationPanel />);
-  expect(screen.getByRole('button', { name: /Seguimiento/ }).disabled).toBe(true);
+  expect(screen.getByRole('link', { name: /Abrir recorridos en Mapa/ }).getAttribute('href')).toBe('/dashboard/mapa');
   expect(screen.getByRole('button', { name: /Activar GPS/ }).disabled).toBe(true);
   await expect(startBackgroundLocation()).rejects.toThrow(/nativa/);
   expect(mock.addWatcher).not.toHaveBeenCalled();

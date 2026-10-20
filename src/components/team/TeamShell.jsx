@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import {
   Bell,
   ClipboardList,
@@ -6,6 +6,7 @@ import {
   LogOut,
   MessageCircle,
   Plus,
+  MapPinned,
   RefreshCw,
   ShieldCheck,
   Sprout,
@@ -38,6 +39,8 @@ import AdminPanel from "./AdminPanel";
 import PullToRefresh from '../PullToRefresh';
 import { offlineResource, accessSignature, protectStorage } from '../../lib/offlineStore';
 import { useSyncLifecycle } from '../../lib/useSyncLifecycle';
+import { syncUserMaps } from '../../lib/mapApi';
+const TeamMap = lazy(() => import('../map/MapPage').then(module => ({default:module.TeamMap})));
 
 function ExitButton() {
   const { signOut } = useAuth();
@@ -255,6 +258,8 @@ function TeamShell() {
         );
       const ownDrafts = await drafts(auth.user.id, null);
       const errors = [];
+      try { await syncUserMaps(fresh, () => activeIdentity.current === auth.user.id); }
+      catch (error) { errors.push(error.message); }
       for (const organization of new Set(
         ownDrafts.map((d) => d.organization_id),
       )) {
@@ -363,6 +368,7 @@ function TeamShell() {
               <Plus size={18} />
               Publicar
             </button>
+            <Link to="/dashboard/mapa" className="btn-secondary hidden sm:inline-flex"><MapPinned size={18}/>Mapa</Link>
           </div>
         </div>
         <nav
@@ -470,6 +476,7 @@ function TeamShell() {
           <div key={orgId || "global"}>
             <Routes>
               <Route index element={<TeamFeed />} />
+              <Route path="mapa" element={<Suspense fallback={<p role="status">Abriendo mapa…</p>}><TeamMap/></Suspense>} />
               <Route path="tareas" element={<Tasks />} />
               <Route path="mensajes" element={<TeamMessages />} />
               <Route path="cuenta" element={<TeamAccount />} />
@@ -497,7 +504,7 @@ function TeamShell() {
       </main>
       <nav
         aria-label="Navegación móvil del equipo"
-        className="mobile-nav fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t bg-white px-2 pt-2 sm:hidden"
+        className="mobile-nav fixed inset-x-0 bottom-0 z-40 grid grid-cols-6 border-t bg-white px-2 pt-2 sm:hidden"
       >
         {links.slice(0, 2).map(({ to, end, label, Icon }) => (
           <NavLink
@@ -523,6 +530,7 @@ function TeamShell() {
           </span>
           Publicar
         </button>
+        <NavLink to="/dashboard/mapa" className={({isActive})=>`flex min-h-14 flex-col items-center justify-center gap-1 text-[11px] ${isActive?'font-semibold text-green-800':'text-stone-500'}`}><MapPinned size={22}/>Mapa</NavLink>
         {links.slice(2).map(({ to, label, Icon }) => (
           <NavLink
             key={to}

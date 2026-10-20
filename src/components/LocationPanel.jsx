@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { isNative, locationState, subscribeLocation, startBackgroundLocation, stopBackgroundLocation, openLocationSettings } from '../lib/nativeLocation';
 
-export default function LocationPanel() {
+export default function LocationPanel({onOpenMap}) {
   const [state, setState] = useState(locationState);
   const [error, setError] = useState('');
   useEffect(() => subscribeLocation(setState), []);
@@ -20,6 +20,6 @@ export default function LocationPanel() {
     {(error || state.error) && <p role="alert" className="mt-2 text-sm text-red-700">{error || state.error}</p>}
     {native && <button className="mt-2 min-h-11 text-sm underline" onClick={() => openLocationSettings().catch(failure => setError(failure.message))}>Abrir ajustes de ubicación</button>}
     <p className="mt-2 text-xs text-stone-500">El sistema puede interrumpir el GPS si forzás el cierre o restringís la batería. Al abrir de nuevo la app, activalo para comenzar otra jornada.</p>
-    <div className="mt-5 border-t pt-4"><button className="btn-secondary" disabled>Seguimiento · Próximamente</button><p className="mt-2 text-sm text-stone-500">Reservado para futuras recorridas. No se registra un historial de movimientos.</p></div>
+    <div className="mt-5 border-t pt-4">{onOpenMap?<button className="btn-secondary" onClick={onOpenMap}>Abrir recorridos en Mapa</button>:<a className="btn-secondary" href="/dashboard/mapa">Abrir recorridos en Mapa</a>}<p className="mt-2 text-sm text-stone-500">Los recorridos se inician explícitamente en Mapa y requieren mantener esa pantalla abierta. Este control de GPS no guarda un historial por sí solo.</p></div>
   </section>;
 }

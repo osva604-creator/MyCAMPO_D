@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useTeam, canManage } from "../../context/TeamContext";
 import { feed } from "../../lib/teamApi";
 import { useResource } from "../../lib/useResource";
@@ -243,6 +243,7 @@ export default function TeamFeed({ own = false }) {
         >
           Nueva publicación
         </button>
+        <Link to="/dashboard/mapa" className="btn-secondary">Mapa</Link>
         <button
           disabled={!resource.data || exporting}
           onClick={backup}

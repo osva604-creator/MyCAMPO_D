@@ -34,3 +34,7 @@ button:disabled { cursor: not-allowed; }
   .btn-secondary { @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-stone-200 bg-white px-4 py-2 text-sm font-semibold text-green-800 hover:bg-green-50 disabled:opacity-50; }
   .panel { @apply rounded-2xl border border-stone-200 bg-white p-5 shadow-sm; }
 }
+/* Keep Leaflet controls below the application header and mobile navigation. */
+.campo-map { height: min(65vh, 640px); min-height: 340px; width: 100%; border-radius: 1.25rem; isolation: isolate; z-index: 0; border: 1px solid #d6d3d1; }
+.map-vertex { background: #fff; border: 3px solid #d97706; border-radius: 50%; box-shadow: 0 1px 4px #0004; }
+.campo-map .leaflet-control-attribution { font-size: 10px; max-width: 100%; }

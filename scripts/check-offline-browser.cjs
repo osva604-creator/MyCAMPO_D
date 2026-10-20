@@ -98,7 +98,7 @@ const id = n => `10000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
  const inspect=()=>page.evaluate(()=>new Promise((resolve,reject)=>{const r=indexedDB.open('mycampo-d-team-v2');r.onsuccess=()=>{const d=r.result,t=d.transaction('drafts');const q=t.objectStore('drafts').getAll();q.onsuccess=()=>resolve(q.result.map(x=>({id:x.id,blob:x.operation.media instanceof Blob,bytes:x.operation.media?.size})));q.onerror=reject;};r.onerror=reject;}));
  const pending=await inspect();assert.equal(pending.length,1);assert(pending[0].blob);assert(pending[0].bytes>0);
  await page.getByRole('navigation',{name:'Navegación móvil del equipo'}).getByRole('link',{name:'Mi cuenta',exact:true}).click();
- assert.equal(await page.getByRole('button',{name:'Seguimiento · Próximamente',exact:true}).isDisabled(),true);
+ assert.equal(await page.getByRole('link',{name:'Abrir recorridos en Mapa',exact:true}).getAttribute('href'),'/dashboard/mapa');
  assert.equal(await page.getByRole('button',{name:'Activar GPS en segundo plano',exact:true}).isDisabled(),true);
  const downloadPromise=page.waitForEvent('download');await page.getByRole('button',{name:'Exportar borradores',exact:true}).click();
  const download=await downloadPromise;await download.saveAs('.qa/drafts-export.json');
