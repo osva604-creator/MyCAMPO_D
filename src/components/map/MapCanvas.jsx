@@ -9,9 +9,17 @@ export default function MapCanvas({features,publications,tracks,layers,preview,v
   latest.current={onClick,onSelect,onVertex};
   useEffect(()=>{
     const instance=L.map(element.current,{center:[-35,-61],zoom:12});map.current=instance;
-    const tile=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors'}).addTo(instance);
-    const error=()=>{element.current?.setAttribute('data-tiles-unavailable','true');};
-    tile.on('tileerror',error);
+    const attribution='Tiles &copy; Esri, TomTom, Garmin, FAO, NOAA, USGS, EPA, NPS';
+    const baseLayers={
+      'Satélite':L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution}),
+      'Calles + relieve':L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution}),
+    };
+    const satellite=baseLayers['Satélite'];
+    const tileError=()=>element.current?.setAttribute('data-tiles-unavailable','true');
+    const tileLoad=()=>element.current?.removeAttribute('data-tiles-unavailable');
+    Object.values(baseLayers).forEach(layer=>layer.on('tileerror',tileError).on('tileload',tileLoad));
+    satellite.addTo(instance);
+    L.control.layers(baseLayers,null,{collapsed:false,position:'topright'}).addTo(instance);
     for(const key of ['parcels','points','tracks','draft'])groups.current[key]=L.layerGroup().addTo(instance);
     instance.on('click',event=>latest.current.onClick([event.latlng.lng,event.latlng.lat]));
     const observer=typeof ResizeObserver!=='undefined'?new ResizeObserver(()=>instance.invalidateSize()):null;
