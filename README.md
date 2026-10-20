@@ -1,6 +1,8 @@
 # MyCAMPO_D
 
-Soporte móvil nativo para Android y iPhone: [preparación, GPS en segundo plano y pruebas de campo](MOBILE.md). El control está en **Tu cuenta → Ubicación de campo**. **Seguimiento · Próximamente** queda reservado. Proyectos sincronizados y 124 pruebas automatizadas aprobadas; los binarios y la validación de GPS en teléfonos reales siguen pendientes.
+Soporte móvil nativo para Android y iPhone: [preparación, GPS en segundo plano y pruebas de campo](MOBILE.md). **Mapa** permite iniciar mediciones GPS de perímetro y labor; los recorridos se guardan localmente y se sincronizan al recuperar conexión. El seguimiento en segundo plano depende de permisos y restricciones del sistema y todavía no se validó con pantalla bloqueada en un teléfono real. Build web y sincronización Capacitor de Android/iOS completados; binarios nativos y prueba física siguen pendientes. 150 pruebas automatizadas aprobadas.
+
+Actualización 20/10/2026: función de mediciones publicada en Cloudflare (`8b9db64e-2764-4787-a7c4-74d0a2cee81f`) y migración aplicada en Supabase (`20261020120000`). La aceptación con pantalla bloqueada en Android/iOS sigue pendiente.
 
 Actualización 19/10/2026: captura offline recuperable, sincronización al reabrir/reconectar, gesto de actualizar, gestión de almacenamiento y cámara a pantalla completa publicados. Ver [OFFLINE_CAPTURE.md](./OFFLINE_CAPTURE.md).
 

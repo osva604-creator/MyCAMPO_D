@@ -27,6 +27,15 @@ export async function queueMap(scope,action,payload,record,photo=null) {
   const operation={scope,operation_id,action,payload,photo};
   const write=async()=>{
     const tx=db.transaction(['records','outbox','points'],'readwrite');
+    if(action==='track.start'){
+      const open=(await tx.objectStore('records').getAll()).find(row=>row.data.kind==='track'&&row.data.status!=='finished');
+      if(open){
+        await tx.done;
+        throw new Error(open.data.user_id!==payload.user_id
+          ?'Hay una medición abierta de otra cuenta en este dispositivo. Iniciá sesión con esa cuenta para recuperarla antes de comenzar otra.'
+          :'Ya hay un recorrido abierto o interrumpido en este dispositivo. Reanudalo o finalizalo antes de iniciar otro.');
+      }
+    }
     const last=await tx.objectStore('outbox').index('order').openCursor(null,'prev');
     const order=Math.max(Date.now(),(last?.value.order||0)+1);
     if(scope!=='local') await tx.objectStore('outbox').put({...operation,order});
@@ -68,6 +77,6 @@ export function syncMap(scope,execute,isCurrent=()=>true) {
 }
 export function mergeMap(remote,local) {
   const records=new Map(remote.map(r=>[r.id,r]));
-  for(const row of local) if(row.pending || row.local) records.set(row.id,row);
+  for(const row of local) if(row.kind==='track'||row.pending||row.local) records.set(row.id,row);
   return [...records.values()].filter(r=>!r.deleted_at);
 }

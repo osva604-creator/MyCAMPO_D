@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { stopBackgroundLocation } from '../lib/nativeLocation';
+import { stopMapTracking } from '../lib/mapTracking';
 import { onNativeAppState } from '../lib/nativeLifecycle';
 import { clearReadCache, offlineIdentity, isConnectionFailure } from '../lib/offlineStore';
 
@@ -21,9 +22,14 @@ export function AuthProvider({ children }) {
       const cached = await offlineIdentity();
       if (active && changed === version) { setOfflineUser(cached); setSession(null); setLoading(false); }
     };
+    const stopLocationSession = userId => {
+      if(!userId)return;
+      void stopMapTracking(userId).then(()=>stopBackgroundLocation())
+        .catch(failure=>{if(active)setError(`No se pudo cerrar el servicio de ubicación: ${failure.message}`);});
+    };
     const { data } = supabase.auth.onAuthStateChange((event, next) => {
       if (!active) return;
-      if (identity.current && next?.user?.id && identity.current !== next.user.id) void stopBackgroundLocation().catch(() => {});
+      if (identity.current && next?.user?.id && identity.current !== next.user.id) stopLocationSession(identity.current);
       const version = ++changed;
       if (!next && event !== 'SIGNED_OUT' && !navigator.onLine) {
         void restoreOffline(version);
@@ -32,7 +38,7 @@ export function AuthProvider({ children }) {
       }
       if (event === 'PASSWORD_RECOVERY') setRecovery(true);
       if (event === 'SIGNED_OUT') {
-        void stopBackgroundLocation().catch(() => {});
+        stopLocationSession(identity.current);
         setRecovery(false);
         if (identity.current) void clearReadCache(identity.current).catch(() => {});
       }
@@ -74,6 +80,7 @@ export function AuthProvider({ children }) {
     signIn: (email, password) => call('signInWithPassword', { email, password }),
     signOut: async () => {
       const user = session?.user?.id || offlineUser?.id;
+      if(user)await stopMapTracking(user,'La sesión terminó; el recorrido quedó pausado.');
       await call('signOut');
       await stopBackgroundLocation();
       if (user) await clearReadCache(user).catch(() => {});

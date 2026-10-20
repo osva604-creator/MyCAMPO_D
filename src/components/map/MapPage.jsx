@@ -4,8 +4,9 @@ import { LocateFixed,MapPinned,Plus,Upload,RefreshCw } from 'lucide-react';
 import { useTeam,canManage } from '../../context/TeamContext';
 import { useMapData } from '../../lib/useMapData';
 import { mapScope,queueMap } from '../../lib/mapStore';
-import { createMapRecorder } from '../../lib/mapRecorder';
-import { validateGeometry,parseGeoJSON,publicationPoint,durationMs,positionIsStale } from '../../lib/mapGeometry';
+import { connectMapTracking,restoreMapTracking } from '../../lib/mapTracking';
+import { validateGeometry,parseGeoJSON,publicationPoint,durationMs,positionIsStale,measurementResult,trackGpsQuality,argentinaDate } from '../../lib/mapGeometry';
+import { isNative } from '../../lib/nativeLocation';
 import { locate,preparePhoto } from '../../lib/media';
 import { mediaBlob } from '../../lib/teamApi';
 import { downloadJson } from '../../lib/teamDrafts';
@@ -14,15 +15,15 @@ import { mapPhoto } from '../../lib/mapApi';
 import { useResource } from '../../lib/useResource';
 import MapCanvas from './MapCanvas';
 
-const today=()=>{const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+const today=()=>argentinaDate(new Date());
 const categories=['incidencia','tranquera','pozo','maquinaria','otro'];
 const colors=['#15803d','#2563eb','#b45309','#7c3aed','#be123c','#0891b2'];
 const fmt=timestamp=>timestamp?new Date(timestamp).toLocaleString('es-AR'):'Sin posición';
 function useClock(){const [now,setNow]=useState(Date.now());useEffect(()=>{const id=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(id);},[]);return now;}
 function TrackStats({track}) {
   const now=useClock(),seconds=Math.floor(durationMs(track,now)/1000);
-  return <div className="mt-2 text-sm"><p>{((track.distance_m||0)/1000).toFixed(2)} km · {Math.floor(seconds/3600)} h {Math.floor(seconds/60)%60} min {seconds%60} s · {track.last_accuracy!=null?`±${Math.round(track.last_accuracy)} m`:'Esperando GPS'}</p>
-    <p className={positionIsStale(track,now)?'mt-1 text-amber-800':'mt-1 text-green-800'}>{positionIsStale(track,now)?'Posición desactualizada o sin señal':'Posición reciente'} · Captura: {fmt(track.last_fix_at)} · Recibida: {fmt(track.received_at)}</p></div>;
+  return <div className="mt-2 text-sm"><p>{(track.distance_m||0).toFixed(1)} m · {Math.floor(seconds/3600)} h {Math.floor(seconds/60)%60} min {seconds%60} s · {track.last_accuracy!=null?`±${Math.round(track.last_accuracy)} m`:'Esperando GPS'}</p>
+    <p className={positionIsStale(track,now)?'mt-1 text-amber-800':'mt-1 text-green-800'}>{positionIsStale(track,now)?'Última señal GPS desactualizada':'GPS actualizado'} · Última posición: {fmt(track.last_fix_at)} · Último movimiento: {fmt(track.last_movement_at||track.samples?.at(-1)?.recorded_at)}</p></div>;
 }
 function Photo({feature,scope,user,online}) {
   const resource=useResource(useCallback(async()=>{
@@ -39,15 +40,18 @@ export function TeamMap() {
 }
 export default function MapPage({team=null,posts=[],actor={id:'local',name:'Cuenta local'},onOpenPost}) {
   const local=!team, user=team?.user.id||'local',org=team?.orgId||null;
-  const scope=mapScope(user,org,team?.access),formKey=`map-editor:${scope}`;
+  const scope=mapScope(user,org,team?.access),formKey=`map-editor:${scope}`,trackingNoticeKey=`map-track-notice:${scope}`;
   const [network,setNetwork]=useState(navigator.onLine),[date,setDate]=useState(today),[historyUser,setHistoryUser]=useState('');
   const online=network&&(team?.online??true);
-  const data=useMapData({scope,user,org,date,online});
+  const isAdmin=team?.access.role==='SUPER_ADMIN',historyFilter=isAdmin?historyUser:'';
+  const data=useMapData({scope,user,userId:user,org,date,historyUser:historyFilter,isAdmin,online});
   const [layers,setLayers]=useState({parcels:true,points:true,tracks:true});
   const [editor,setEditor]=useState(null),[vertices,setVertices]=useState([]),[drawing,setDrawing]=useState(false),[placing,setPlacing]=useState(false);
   const [preview,setPreview]=useState([]),[selected,setSelected]=useState(null),[center,setCenter]=useState(null),[confirm,setConfirm]=useState(null);
   const [busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[gpsError,setGpsError]=useState('');
-  const [current,setCurrent]=useState(null),[shared,setShared]=useState(false),[formReady,setFormReady]=useState(false);
+  const [current,setCurrent]=useState(null),[formReady,setFormReady]=useState(false),[measurementType,setMeasurementType]=useState('perimeter');
+  const [implementWidth,setImplementWidth]=useState(''),[noticeAccepted,setNoticeAccepted]=useState(false),[noticeReady,setNoticeReady]=useState(false);
+  const [closurePreview,setClosurePreview]=useState(null),[resultTrack,setResultTrack]=useState(null);
   const recorder=useRef(null),recovered=useRef(false),saved=useRef(Promise.resolve()),mounted=useRef(true);
   const teams=local?[{id:'local',name:'Dispositivo local'}]:(team.info.teams||[]).filter(t=>t.organization_id===org&&t.active&&(team.access.role==='SUPER_ADMIN'||team.access.teams.some(a=>a.id===t.id)));
   const [teamId,setTeamId]=useState(teams[0]?.id||'');
@@ -62,17 +66,27 @@ export default function MapPage({team=null,posts=[],actor={id:'local',name:'Cuen
     mounted.current=true;
     const changed=()=>setNetwork(navigator.onLine);
     window.addEventListener('online',changed);window.addEventListener('offline',changed);
-    recorder.current=createMapRecorder({scope,context,onChange:t=>{if(mounted.current)setCurrent({...t});},onError:message=>{if(mounted.current)setGpsError(message);}});
-    const visible=()=>{if(document.visibilityState==='hidden')void recorder.current.pause().catch(failure=>{if(mounted.current)setError(failure.message);});};
-    document.addEventListener('visibilitychange',visible);
-    return()=>{mounted.current=false;window.removeEventListener('online',changed);window.removeEventListener('offline',changed);document.removeEventListener('visibilitychange',visible);void recorder.current.dispose().catch(()=>{});};
+    let connection;
+    try{
+      connection=connectMapTracking({scope,context},({track,error:message})=>{
+        if(mounted.current){setCurrent(track?{...track}:null);setGpsError(message||'');}
+      });
+      recorder.current=connection.recorder;
+    }catch(failure){setError(failure.message);}
+    return()=>{mounted.current=false;window.removeEventListener('online',changed);window.removeEventListener('offline',changed);connection?.disconnect();};
   },[scope]);
   useEffect(()=>{
     if(recovered.current||!data.localReady)return;
     recovered.current=true;
-    const pendingTrack=data.records.filter(r=>r.kind==='track'&&r.user_id===user&&r.status!=='finished').sort((a,b)=>b.started_at.localeCompare(a.started_at))[0];
-    if(pendingTrack)void recorder.current.recover(pendingTrack).catch(failure=>setError(failure.message));
+    if(recorder.current)void restoreMapTracking({scope,context},data.records).catch(failure=>setError(failure.message));
   },[data.localReady,data.records,user]);
+  useEffect(()=>{
+    let active=true;
+    readForm(trackingNoticeKey).then(row=>{if(active)setNoticeAccepted(Boolean(row?.data?.accepted));})
+      .catch(failure=>{if(active)setError(failure.message);})
+      .finally(()=>{if(active)setNoticeReady(true);});
+    return()=>{active=false;};
+  },[trackingNoticeKey]);
   useEffect(()=>{
     let active=true;
     readForm(formKey).then(row=>{
@@ -88,6 +102,59 @@ export default function MapPage({team=null,posts=[],actor={id:'local',name:'Cuen
   },[editor,vertices,drawing,preview,formReady,formKey]);
   async function act(work){setBusy(true);setError('');setNotice('');try{await work();}catch(failure){if(mounted.current)setError(failure.message||'No se pudo completar la acción.');}finally{if(mounted.current)setBusy(false);}}
   const fresh=(kind,geometry=null)=>({id:crypto.randomUUID(),kind,team_id:teamId,geometry,name:'',description:'',category:'otro',crop:'',season:'',responsible_id:null,color:colors[data.features.length%colors.length],version:null});
+  async function startOrStopMeasurement(){
+    if(current?.status==='active'){
+      await finishMeasurement(false);
+      return;
+    }
+    if(current?.status==='paused'){
+      await recorder.current.resume();
+      setGpsError('Esperando una posición GPS reciente para reanudar el recorrido.');
+      return;
+    }
+    if(!noticeAccepted)throw new Error('Leé y confirmá el aviso de privacidad y ubicación antes de iniciar.');
+    if(!permitted||!teamId)throw new Error('Elegí un equipo activo autorizado para registrar la medición.');
+    setResultTrack(null);setClosurePreview(null);
+    await recorder.current.start(teamId,{measurementType, width:implementWidth?Number(implementWidth):null});
+    setGpsError('Esperando una posición GPS reciente.');
+  }
+  async function finishMeasurement(closePerimeter,skipClosure=false){
+    const recording=recorder.current?.current();
+    if(!recording||recording.status!=='active')throw new Error('No hay una medición activa para detener.');
+    if(!recording.measurement_type){
+      await recorder.current.finish();
+      const finished=recorder.current.current();
+      const result={...finished,measurement_type:'legacy',gps_quality:trackGpsQuality(finished)};
+      setCurrent({...finished});setResultTrack(result);setNotice('Recorrido anterior finalizado. No se calculó una superficie porque no se habían guardado parámetros de medición.');
+      return;
+    }
+    let calculated=null,issue='';
+    try{
+      calculated=measurementResult({...recording,duration_ms:durationMs(recording)}, {closePerimeter});
+      if(calculated.closure_required&&!skipClosure){
+        setClosurePreview(measurementResult({...recording,duration_ms:durationMs(recording)},{closePerimeter:true}));
+        return;
+      }
+    }catch(failure){issue=failure.message;}
+    await recorder.current.finish();
+    const finished=recorder.current.current();
+    if(!issue){
+      try{calculated=measurementResult(finished,{closePerimeter});}
+      catch(failure){issue=failure.message;}
+    }
+    const result=calculated&&!calculated.closure_required?calculated:{
+      measurement_type:finished.measurement_type,distance_m:finished.distance_m||0,duration_ms:finished.duration_ms||0,
+      gps_quality:trackGpsQuality(finished),closure_distance_m:calculated?.closure_distance_m??null,
+      interruption_reason:issue||finished.interruption_reason||'No hay geometría suficiente para calcular una superficie confiable.',
+    };
+    await recorder.current.saveResult(result);
+    setCurrent({...recorder.current.current()});setResultTrack({...recorder.current.current()});setClosurePreview(null);
+    setNotice('Medición detenida y resultado guardado. Las superficies son estimadas y no sustituyen una mensura.');
+  }
+  async function acceptTrackingNotice(accepted){
+    setNoticeAccepted(accepted);
+    await saveForm(trackingNoticeKey,{accepted});
+  }
   async function clearEditor(){await saved.current;await removeForm(formKey);setEditor(null);setVertices([]);setDrawing(false);setPlacing(false);setPreview([]);}
   async function myLocation(point=false){await act(async()=>{const fix=await locate({timeout:30000});if(!mounted.current)return;const geometry={type:'Point',coordinates:[fix.lng,fix.lat]};setCenter({...geometry,nonce:Date.now()});if(point){setEditor(fresh('point',geometry));setPlacing(false);}});}
   function mapClick(coordinates){if(drawing)setVertices(v=>[...v,coordinates]);else if(placing){setEditor(fresh('point',{type:'Point',coordinates}));setPlacing(false);}}
@@ -123,13 +190,14 @@ export default function MapPage({team=null,posts=[],actor={id:'local',name:'Cuen
   });}
   const editorField=(key,value)=>setEditor(e=>({...e,[key]:value}));
   const selectedLive=selected?.kind==='track'?data.tracks.find(t=>t.id===selected.id)||selected:selected;
-  const visibleTracks=data.tracks.filter(t=>(t.status!=='finished'||t.started_at?.slice(0,10)===date)&&(!historyUser||t.user_id===historyUser));
+  const visibleTracks=data.tracks;
   const canEdit=selected&&selected.kind!=='publication'&&selected.kind!=='track'&&(manages(selected.team_id)||(selected.kind==='point'&&selected.author_id===user));
   const active=current&&current.status!=='finished';
+  const mapPreview=closurePreview?.geometry?[...preview,{id:'perimeter-closure',geometry:closurePreview.geometry}]:preview;
   return <section className="space-y-4" aria-label="Mapa de campo">
     <div className="flex flex-wrap items-start justify-between gap-3"><div><h1 className="flex items-center gap-2 text-2xl font-bold"><MapPinned/>Mapa</h1><p className="mt-1 text-sm text-stone-500">Lotes, puntos y recorridos de {local?'este dispositivo':team.info.organization?.name||'tu organización'}.</p></div>
       <button className="btn-secondary" disabled={!org||!online||data.syncing} onClick={data.sync}><RefreshCw size={17}/>{data.syncing?'Sincronizando…':`Sincronizar mapa (${data.pending})`}</button></div>
-    <p role="status" className="text-sm text-stone-600">{local?'Modo local · no se comparte con el equipo':`${data.pending} operaciones pendientes · ${online&&!data.offline?'Con conexión':'Sin conexión · copia del dispositivo'}`}{org&&` · ${data.realtime==='SUBSCRIBED'?'Actualización en vivo conectada':'Reconectando en vivo; se reintenta y consulta cada 30 s'}`}</p>
+    <p role="status" className="text-sm text-stone-600">{local?'Modo local · no se comparte con el equipo':`${data.pending} operaciones pendientes · ${online&&!data.offline?'Con conexión':'Sin conexión · copia del dispositivo'}`}{org&&` · ${data.realtime==='SUBSCRIBED'?'Actualización en vivo conectada':'Reconectando actualizaciones en vivo'}`}</p>
     <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">El mapa base necesita internet. Sin conexión podés registrar puntos y recorridos sobre las geometrías guardadas. No se descargan mapas para uso offline.</p>
     {data.loading&&<p role="status">Cargando mapa y registros…</p>}
     {(error||data.error)&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error||data.error}</p>}
@@ -148,12 +216,39 @@ export default function MapPage({team=null,posts=[],actor={id:'local',name:'Cuen
       <fieldset className="flex flex-wrap gap-4 text-sm"><legend className="mb-2 font-semibold">Capas</legend>{[['parcels','Lotes'],['points','Puntos y publicaciones'],['tracks','Recorridos']].map(([key,label])=><label key={key} className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={layers[key]} onChange={e=>setLayers(v=>({...v,[key]:e.target.checked}))}/>{label}</label>)}</fieldset>
     </div>
     <section className="panel" aria-label="Registro de recorridos"><h2 className="text-lg font-bold">Recorridos</h2>
-      <p className="mt-2 text-sm text-stone-600">El seguimiento comienza solo al iniciarlo. Mantené esta pantalla abierta: al salir de Mapa o pasar la app a segundo plano se pausa. No se garantiza el registro con la pantalla bloqueada.</p>
-      {!active?<div className="mt-3 flex flex-wrap items-center gap-3"><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={shared} disabled={local} onChange={e=>setShared(e.target.checked)}/>Compartir ubicación y recorrido con integrantes autorizados de mi equipo</label><button className="btn-primary" disabled={!permitted||busy||!formReady} onClick={()=>act(async()=>{await recorder.current.start(teamId,local?false:shared);setGpsError('Esperando señal GPS…');})}>Iniciar recorrido</button></div>:
-      <><p className="mt-3 font-semibold">{current.status==='active'?'Registrando':'En pausa'} · {current.shared?'Compartido con el equipo':'Privado'}</p><TrackStats track={current}/><div className="mt-3 flex flex-wrap gap-2">{current.status==='active'?<button className="btn-secondary" disabled={busy} onClick={()=>act(()=>recorder.current.pause())}>Pausar</button>:<button className="btn-secondary" disabled={busy} onClick={()=>act(()=>recorder.current.resume())}>Continuar</button>}<button className="btn-primary" disabled={busy} onClick={()=>act(()=>recorder.current.finish())}>Finalizar</button></div></>}
+      <p className="mt-2 text-sm text-stone-600">{isNative()?'En Android/iOS puede continuar en segundo plano si el sistema y los permisos lo permiten; no se garantiza continuidad tras cierre forzado.':'En web/PWA el sistema puede suspender la ubicación en segundo plano; no se garantiza seguimiento continuo.'} Al iniciar se registra la ubicación del dispositivo y el SUPER_ADMIN puede consultar el historial dentro del alcance autorizado.</p>
+      {!active&&(!current||current.status==='finished')&&<div className="mt-3 space-y-3">
+        <label className="form-label">Tipo de medición<select className="form-input" value={measurementType} disabled={busy||Boolean(current&&current.status!=='finished')} onChange={event=>setMeasurementType(event.target.value)}><option value="perimeter">Medir perímetro de un lote</option><option value="labor">Medir labor realizada</option></select></label>
+        {measurementType==='labor'&&<label className="form-label">Ancho de labor (m)<input className="form-input" type="number" min="0.01" max="100" step="0.01" required value={implementWidth} disabled={busy||Boolean(current&&current.status!=='finished')} onChange={event=>setImplementWidth(event.target.value)}/></label>}
+      </div>}
+      {!active&&current?.status==='paused'&&<p className="mt-3 text-sm">Medición seleccionada: {current.measurement_type==='labor'?'labor':current.measurement_type==='perimeter'?'perímetro':'recorrido anterior sin tipo de medición guardado'}.</p>}
+      <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+        <p>Antes de iniciar: se registrará la ubicación durante el recorrido; en la app nativa puede continuar en segundo plano y el SUPER_ADMIN puede consultar el historial. La medición es estimada y no reemplaza una mensura.</p>
+        {!noticeAccepted&&<label className="mt-3 flex items-start gap-2"><input type="checkbox" checked={false} disabled={!noticeReady||busy} onChange={event=>void act(()=>acceptTrackingNotice(event.target.checked))}/><span>Leí y acepto el aviso de registro de ubicación.</span></label>}
+        {noticeAccepted&&<p className="mt-2 font-medium">Aviso aceptado para esta cuenta.</p>}
+      </div>
+      {active&&<><p className="mt-3 font-semibold text-green-800" role="status">● Medición activa · Ubicación visible durante el registro</p><TrackStats track={current}/></>}
+      {current?.status==='paused'&&<><p className="mt-3 font-semibold text-amber-800">Medición pausada · {current.interruption_reason||'Sin ubicación activa'}</p><TrackStats track={current}/></>}
+      <button className="btn-primary mt-3" disabled={busy||Boolean(closurePreview)||!formReady||!noticeReady||(!active&&!noticeAccepted)||(!active&&current?.status!=='paused'&&!permitted)||(!active&&current?.status!=='paused'&&measurementType==='labor'&&(!Number.isFinite(Number(implementWidth))||Number(implementWidth)<=0))}
+        onClick={()=>act(startOrStopMeasurement)}>{active?'Detener y ver resultado':current?.status==='paused'?'Reanudar medición':'Iniciar medición'}</button>
       {gpsError&&<p role="status" className="mt-3 text-sm text-amber-800">{gpsError}</p>}
     </section>
-    <MapCanvas features={data.features} publications={publications} tracks={data.tracks} layers={layers} preview={preview} vertices={vertices} drawing={drawing} editable={Boolean(editor?.geometry&&editor.kind==='parcel')} onVertex={updateVertex} onClick={mapClick} onSelect={setSelected} center={center}/>
+    {closurePreview&&<section className="panel border-amber-300" role="alertdialog" aria-label="Confirmar cierre del perímetro">
+      <h2 className="font-bold">Confirmar cierre del perímetro</h2><p className="mt-2 text-sm">El tramo recto entre el último punto y el inicio es de {closurePreview.closure_distance_m.toFixed(1)} m. La vista previa lo cierra para calcular el área; no se suma a los metros realmente recorridos.</p>
+      <p className="mt-2 text-sm">Área estimada de vista previa: {closurePreview.area_ha.toFixed(2)} ha.</p>
+      <div className="mt-3 flex flex-wrap gap-2"><button className="btn-primary" disabled={busy} onClick={()=>act(()=>finishMeasurement(true))}>Confirmar cierre y guardar</button><button className="btn-secondary" disabled={busy} onClick={()=>act(()=>finishMeasurement(false,true))}>Finalizar sin hectáreas</button></div>
+    </section>}
+    {resultTrack&&<section className="panel" aria-label="Resultado de la medición">
+      <h2 className="text-lg font-bold">Resultado de la medición</h2><p className="mt-2 text-sm">{name(resultTrack.user_id)} · {fmt(resultTrack.started_at)} · {resultTrack.measurement_type==='labor'?'Labor realizada':resultTrack.measurement_type==='perimeter'?'Perímetro de lote':'Recorrido anterior'}</p>
+      <p className="mt-2 text-sm">Metros lineales recorridos: {(resultTrack.distance_m||0).toFixed(1)} m · Duración: {Math.floor((resultTrack.duration_ms||0)/60000)} min · Calidad GPS: {resultTrack.gps_quality?.sample_count??resultTrack.samples?.length??0} puntos, precisión máx. {resultTrack.gps_quality?.max_accuracy_m==null?'sin datos':`±${resultTrack.gps_quality.max_accuracy_m.toFixed(1)} m`}.</p>
+      {resultTrack.measurement_type==='labor'&&<p className="mt-2 text-sm">Ancho: {resultTrack.implement_width_m} m · Superficie bruta estimada: {(resultTrack.result_area_ha||0).toFixed(2)} ha. Puede incluir solapamientos, giros y pasadas repetidas; no representa superficie neta trabajada.</p>}
+      {resultTrack.measurement_type==='perimeter'&&resultTrack.result_area_ha!=null&&<p className="mt-2 text-sm">Superficie encerrada estimada: {resultTrack.result_area_ha.toFixed(2)} ha · Tramo de cierre: {(resultTrack.closure_distance_m||0).toFixed(1)} m (no incluido en la distancia recorrida).</p>}
+      {resultTrack.measurement_type==='perimeter'&&resultTrack.result_area_ha==null&&<p className="mt-2 text-sm text-amber-800">No se calculó un área confiable. {resultTrack.interruption_reason||'Revisá la señal GPS y repetí el perímetro sin interrupciones.'}</p>}
+      {resultTrack.measurement_type==='legacy'&&<p className="mt-2 text-sm text-amber-800">No se calculó una superficie para este recorrido anterior.</p>}
+      <p className="mt-2 text-xs text-stone-500">Resultado estimado; no sustituye una mensura.</p>
+      {resultTrack.measurement_type==='perimeter'&&resultTrack.result_geometry&&manages(resultTrack.team_id)&&<button className="btn-secondary mt-3" disabled={busy||Boolean(editor)} onClick={()=>{const geometry=resultTrack.result_geometry;setEditor({...fresh('parcel',geometry),name:`Lote medido ${argentinaDate(resultTrack.started_at)}`});setVertices(geometry.coordinates[0].slice(0,-1));setDrawing(false);setSelected(null);}}>Guardar perímetro como lote</button>}
+    </section>}
+    <MapCanvas features={data.features} publications={publications} tracks={visibleTracks} layers={layers} preview={mapPreview} vertices={vertices} drawing={drawing} editable={Boolean(editor?.geometry&&editor.kind==='parcel')} onVertex={updateVertex} onClick={mapClick} onSelect={setSelected} center={center}/>
     {drawing&&<div className="panel" role="status"><p>Tocá el mapa para agregar vértices. Podés arrastrarlos para ajustarlos. {vertices.length}/500 vértices.</p><div className="mt-3 flex gap-2"><button className="btn-secondary" disabled={!vertices.length} onClick={()=>setVertices(v=>v.slice(0,-1))}>Deshacer vértice</button><button className="btn-primary" disabled={vertices.length<3||busy} onClick={finishDrawing}>Cerrar polígono</button></div></div>}
     {editor&&<form className="panel space-y-3" onSubmit={saveEditor} aria-label="Ficha del mapa">
       <h2 className="text-lg font-bold">{preview.length?'Vista previa de importación':editor.kind==='parcel'?'Ficha del lote':'Ficha del punto'}</h2>
@@ -171,12 +266,12 @@ export default function MapPage({team=null,posts=[],actor={id:'local',name:'Cuen
       {selectedLive.kind==='parcel'&&<p className="mt-2 text-sm">{selectedLive.area_ha.toFixed(2)} ha · {selectedLive.crop||'Sin cultivo'} · {selectedLive.season||'Sin campaña'} · Responsable: {selectedLive.responsible_id?name(selectedLive.responsible_id):'Sin asignar'}</p>}
       {selectedLive.kind==='point'&&<><p className="mt-2 text-sm">{selectedLive.category} · {selectedLive.geometry.coordinates.join(', ')} · {name(selectedLive.author_id)} · {fmt(selectedLive.created_at)}</p><Photo feature={selectedLive} scope={scope} user={user} online={online}/></>}
       {selectedLive.kind==='publication'&&(local?<button className="btn-primary mt-3" onClick={()=>onOpenPost?.(selectedLive.id)}>Abrir publicación original</button>:<Link className="btn-primary mt-3" to={`/dashboard#publicacion-${selectedLive.id}`}>Abrir publicación original</Link>)}
-      {selectedLive.kind==='track'&&<><p className="mt-2 text-sm">{name(selectedLive.user_id)} · {fmt(selectedLive.started_at)} · {selectedLive.status} · {selectedLive.shared?'Compartido':'Privado'}</p><TrackStats track={selectedLive}/>{selectedLive.user_id===user&&selectedLive.status==='paused'&&(!active||current.id===selectedLive.id)&&<button className="btn-primary mt-3" disabled={busy} onClick={()=>act(()=>recorder.current.resume(selectedLive))}>Continuar este recorrido</button>}</>}
+      {selectedLive.kind==='track'&&<><p className="mt-2 text-sm">{name(selectedLive.user_id)} · {fmt(selectedLive.started_at)} · {selectedLive.status} · {selectedLive.measurement_type==='labor'?'Labor':selectedLive.measurement_type==='perimeter'?'Perímetro':'Recorrido anterior'}</p><TrackStats track={selectedLive}/>{selectedLive.result_area_ha!=null&&<p className="mt-2 text-sm">Área estimada: {selectedLive.result_area_ha.toFixed(2)} ha</p>}{selectedLive.user_id===user&&selectedLive.status==='paused'&&(!active||current.id===selectedLive.id)&&<button className="btn-primary mt-3" disabled={busy} onClick={()=>act(()=>recorder.current.resume(selectedLive))}>Reanudar medición</button>}</>}
       <div className="mt-3 flex flex-wrap gap-2">{canEdit&&<button className="btn-secondary" disabled={busy||!!editor} onClick={()=>edit(selectedLive)}>Editar ficha y geometría</button>}{(canEdit||(selectedLive.kind==='track'&&selectedLive.user_id===user&&selectedLive.status==='finished'))&&<button className="btn-secondary" onClick={()=>setConfirm(selectedLive)}>Eliminar</button>}</div>
     </section>}
     {confirm&&<section className="panel border-red-200" role="alertdialog" aria-label="Confirmar eliminación"><p>¿Eliminar {confirm.name||'este recorrido'}? Se quitará del mapa compartido al sincronizar.</p><div className="mt-3 flex gap-2"><button className="btn-primary" disabled={busy} onClick={remove}>Confirmar eliminación</button><button className="btn-secondary" onClick={()=>setConfirm(null)}>Conservar</button></div></section>}
     <section className="panel"><h2 className="text-lg font-bold">Lotes y puntos</h2>{!data.features.length&&!publications.length?<p className="mt-3 text-sm text-stone-500">No hay lotes, puntos ni publicaciones con coordenadas válidas para mostrar.</p>:<ul className="mt-3 grid gap-2 sm:grid-cols-2">{data.features.map(f=><li key={f.id}><button className="flex min-h-11 w-full items-center gap-2 rounded-xl border p-3 text-left text-sm" onClick={()=>{setSelected(f);const p=f.geometry.type==='Point'?f.geometry.coordinates:f.geometry.coordinates[0][0];setCenter({coordinates:p,nonce:Date.now()});}}><span className="size-3 shrink-0 rounded-full" style={{background:f.color}}/>{f.name} · {f.pending?'Pendiente':local?'Solo local':'Sincronizado'}</button></li>)}{publications.map(p=><li key={`post:${p.id}`}><button className="min-h-11 w-full rounded-xl border p-3 text-left text-sm" onClick={()=>{setSelected({...p,kind:'publication'});setCenter({...publicationPoint(p),nonce:Date.now()});}}>Publicación · {p.body||p.caption}</button></li>)}</ul>}</section>
-    <section className="panel"><h2 className="text-lg font-bold">Historial de recorridos</h2><div className="mt-3 flex flex-wrap gap-3"><label className="form-label">Fecha<input type="date" className="form-input" value={date} onChange={e=>{if(e.target.value)setDate(e.target.value);}}/></label><label className="form-label">Usuario<select className="form-input" value={historyUser} onChange={e=>setHistoryUser(e.target.value)}><option value="">Todos los autorizados</option>{people.map(p=><option key={p.user_id} value={p.user_id}>{p.name}</option>)}</select></label></div><p className="mt-2 text-xs text-stone-500">Se incluyen los recorridos abiertos, aunque hayan comenzado otro día.</p><ul className="mt-3 space-y-2">{visibleTracks.map(t=><li key={t.id}><button className="min-h-11 w-full rounded-xl border p-3 text-left text-sm" onClick={()=>setSelected(t)}>{name(t.user_id)} · {fmt(t.started_at)} · {t.status==='active'?'Activo':t.status==='paused'?'Pausado':'Finalizado'} · {t.pending?'Pendiente':local?'Solo local':'Sincronizado'} · {t.shared?'Compartido':'Privado'}</button></li>)}</ul>{!visibleTracks.length&&<p className="mt-3 text-sm text-stone-500">No hay recorridos para esta fecha y usuario.</p>}</section>
-    <button className="btn-secondary" onClick={()=>act(()=>downloadJson('mycampo-d-mapa.json',{exported_at:new Date().toISOString(),mode:local?'local':'team',organization_id:org,records:data.records,features:data.features,tracks:data.tracks}))}>Exportar respaldo del mapa</button>
+    <section className="panel"><h2 className="text-lg font-bold">Historial de recorridos</h2><div className="mt-3 flex flex-wrap gap-3"><label className="form-label">Fecha<input type="date" className="form-input" value={date} onChange={e=>{if(e.target.value)setDate(e.target.value);}}/></label>{isAdmin&&<label className="form-label">Usuario<select className="form-input" value={historyUser} onChange={e=>setHistoryUser(e.target.value)}><option value="">Todos los usuarios autorizados</option>{people.map(p=><option key={p.user_id} value={p.user_id}>{p.name}</option>)}</select></label>}</div><ul className="mt-3 space-y-2">{visibleTracks.map(t=><li key={t.id}><button className="min-h-11 w-full rounded-xl border p-3 text-left text-sm" onClick={()=>setSelected(t)}>{name(t.user_id)} · {fmt(t.started_at)} · {t.status==='active'?'Activo':t.status==='paused'?'Pausado':'Finalizado'} · {t.measurement_type==='labor'?'Labor':t.measurement_type==='perimeter'?'Perímetro':'Recorrido previo'} · {t.pending?'Pendiente':local?'Solo local':'Sincronizado'}</button></li>)}</ul>{!visibleTracks.length&&<p className="mt-3 text-sm text-stone-500">No hay recorridos para esta fecha{isAdmin&&historyUser?' y usuario seleccionado':''}.</p>}</section>
+    <button className="btn-secondary" onClick={()=>act(()=>downloadJson('mycampo-d-mapa.json',{exported_at:new Date().toISOString(),mode:local?'local':'team',organization_id:org,records:data.records,features:data.features,tracks:visibleTracks}))}>Exportar respaldo del mapa</button>
   </section>;
 }

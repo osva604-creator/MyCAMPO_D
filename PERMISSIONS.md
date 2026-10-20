@@ -46,3 +46,11 @@ La supervisión administrativa debe informarse a los usuarios antes de habilitar
 La tercera migración revoca escrituras directas de contenido y subidas directas de clientes a Storage. Publicaciones, menciones, comentarios, reacciones, tareas, conversaciones y mensajes usan operaciones transaccionales del backend con permisos vigentes. Las lecturas de mensajes se registran solo para la identidad actual. Las invitaciones oficiales siguen un flujo administrativo separado. Un booleano o rol local de React no autoriza operaciones.
 
 Los scripts antiguos `supabase/schema.sql` y `supabase/activate-team.sql` no implementan esta matriz y no deben aplicarse para activar la nueva arquitectura.
+
+## Historial de recorridos del mapa
+
+- Cada integrante puede consultar únicamente sus propios recorridos. SUPER_ADMIN puede consultar los recorridos de todos los usuarios dentro de la organización/equipo autorizado que esté seleccionado.
+- El indicador `shared` de los registros anteriores se conserva como columna por compatibilidad, pero la migración `20261020120000_map_track_measurements_and_private_access.sql` lo limpia y las políticas RLS ya no lo usan. Se conservan los recorridos y sus puntos; los recorridos que antes se compartían dejan de ser visibles para otros integrantes. Esto evita exponer recorridos anteriormente privados.
+- Las operaciones de escritura de recorridos siguen pasando por comandos backend autenticados y verifican que el actor sea su propietario. SUPER_ADMIN no puede modificar recorridos ajenos.
+- Antes de iniciar una medición se informa del registro de ubicación y del acceso del SUPER_ADMIN. La ubicación solo comienza tras la acción explícita de inicio. La app nativa muestra el indicador/aviso del sistema cuando el plugin está activo; la continuidad depende de los permisos y restricciones de Android/iOS. Web/PWA no garantiza ubicación en segundo plano.
+- La migración de mediciones y acceso privado se aplicó en Supabase de producción el 20/10/2026 y se registró como versión `20261020120000`. Se verificaron las columnas y RPC nuevas, las dos políticas RLS de recorridos y muestras, y que el RPC no es ejecutable por `anon`: propietario o SUPER_ADMIN dentro del alcance autorizado.

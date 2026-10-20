@@ -1,5 +1,7 @@
 # Etapa E — verificación y despliegue
 
+Actualización de mapa y mediciones GPS 20/10/2026: migración Supabase `20261020120000` aplicada y verificada; frontend Cloudflare publicado, versión `8b9db64e-2764-4787-a7c4-74d0a2cee81f`. Pasaron 150 tests, build web y `mobile:sync`; las rutas `/login`, `/dashboard` y `/local` responden 200. No se generaron binarios móviles ni se validó el seguimiento con pantalla bloqueada en dispositivos reales.
+
 Actualización de captura offline 19/10/2026: frontend Cloudflare `67e810df-e33a-4dee-afe7-48fd8b12c55c` publicado con GPS al disparar; 114 pruebas en 21 archivos aprobadas y verificación de navegador sobre el dominio publicado con backend simulado. Ver [OFFLINE_CAPTURE.md](./OFFLINE_CAPTURE.md).
 
 Actualización 19/10/2026: gerente general desplegado con aprobación del usuario; migración remota `20261019183652`, campo-platform v5 y frontend Cloudflare `d2212c8c-1761-4efd-bb5a-30f701687da6`. Ver [GENERAL_MANAGER.md](./GENERAL_MANAGER.md).

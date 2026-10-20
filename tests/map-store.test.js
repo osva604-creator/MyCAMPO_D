@@ -46,3 +46,10 @@ it('stops replay when identity changes and never restores removed server data fr
   expect(mergeMap([],[{id:'removed',local:false,pending:false}])).toEqual([]);
   expect(mergeMap([{id:'same',version:2}],[{id:'same',pending:true,version:3}])[0].version).toBe(3);
 });
+it('atomically prevents concurrent open tracks across map scopes on one device',async()=>{
+  await queueMap('team:first','track.start',{id:'first',user_id:'first-user'},{id:'first',kind:'track',status:'active',user_id:'first-user'});
+  await expect(queueMap('team:second','track.start',{id:'second',user_id:'second-user'},{id:'second',kind:'track',status:'active',user_id:'second-user'}))
+    .rejects.toThrow(/medición abierta de otra cuenta/);
+  expect(await mapRecords('team:first')).toHaveLength(1);
+  expect(await mapRecords('team:second')).toHaveLength(0);
+});

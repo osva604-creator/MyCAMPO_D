@@ -18,6 +18,7 @@ import { AccessProvider } from "./context/AccessContext";
 import ActivateAccount from "./components/ActivateAccount";
 import StoragePanel from './components/StoragePanel';
 import LocationPanel from './components/LocationPanel';
+import MapRecordingIndicator from './components/map/MapRecordingIndicator';
 import PullToRefresh from './components/PullToRefresh';
 const TeamGate = lazy(() => import("./components/team/TeamShell"));
 const LocalMap = lazy(() => import('./components/map/MapPage'));
@@ -90,6 +91,7 @@ function LocalField() {
   }
   return (
     <>
+      <MapRecordingIndicator onOpen={() => setSection('map')} />
       <Navbar onCreatePost={() => setCreating(true)} onMap={() => setSection('map')} />
       <main
         id="inicio"

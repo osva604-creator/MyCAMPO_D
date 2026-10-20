@@ -40,6 +40,7 @@ import PullToRefresh from '../PullToRefresh';
 import { offlineResource, accessSignature, protectStorage } from '../../lib/offlineStore';
 import { useSyncLifecycle } from '../../lib/useSyncLifecycle';
 import { syncUserMaps } from '../../lib/mapApi';
+import MapRecordingIndicator from '../map/MapRecordingIndicator';
 const TeamMap = lazy(() => import('../map/MapPage').then(module => ({default:module.TeamMap})));
 
 function ExitButton() {
@@ -331,6 +332,7 @@ function TeamShell() {
   };
   return (
     <TeamContext.Provider value={scope}>
+      <MapRecordingIndicator />
       <header className="sticky top-0 z-30 border-b border-stone-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
           <Link to="/dashboard" className="flex items-center gap-2">

@@ -25,7 +25,7 @@ it('keeps only the latest point, requests the Android notification and stops the
   expect(mock.addWatcher).toHaveBeenCalledTimes(1);
   expect(mock.requestPermissions).toHaveBeenCalledTimes(1);
   const [options, callback] = mock.addWatcher.mock.calls[0];
-  expect(options).toMatchObject({ stale: false, requestPermissions: true, distanceFilter: 10, backgroundMessage: expect.any(String) });
+  expect(options).toMatchObject({ stale: false, requestPermissions: true, distanceFilter: 0, backgroundMessage: expect.any(String) });
   callback({ latitude: -35, longitude: -61, accuracy: 7, time: 1792436400000 });
   callback({ latitude: -36, longitude: -62, accuracy: 8, time: 1792436401000 });
   expect(locationState().fix.lat).toBe(-36);
