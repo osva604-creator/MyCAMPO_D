@@ -10,7 +10,8 @@ export default function MapCanvas({features,publications,tracks,layers,preview,v
   const [lng,lat]=center?.coordinates||[];
   latest.current={...latest.current,onClick,onSelect,onVertex,onClosePolygon,drawing};
   useEffect(()=>{
-    const instance=L.map(element.current,{center:[-35,-61],zoom:12});map.current=instance;
+    // 26°53'13.64"S 64°59'54.94"W: centro inicial común a todos los usuarios.
+    const instance=L.map(element.current,{center:[-26.88712222222222,-64.99859444444445],zoom:12});map.current=instance;
     const attribution='Tiles &copy; Esri, TomTom, Garmin, FAO, NOAA, USGS, EPA, NPS';
     const baseLayers={
       satellite:L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution}),
