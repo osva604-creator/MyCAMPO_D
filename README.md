@@ -1,5 +1,10 @@
 # MyCAMPO_D
 
+Actualización 21/10/2026: mapas GIS (GeoJSON/KML/KMZ/Shapefile ZIP), popups,
+medición manual de hectáreas y KMZ para compartir. Memoria, caché y consultas
+Supabase reforzadas; aviso de instalación de dos segundos. Ver
+[revisión de almacenamiento y validación](STORAGE_REVIEW.md).
+
 Soporte móvil nativo para Android y iPhone: [preparación, GPS en segundo plano y pruebas de campo](MOBILE.md). **Mapa** permite iniciar mediciones GPS de perímetro y labor; los recorridos se guardan localmente y se sincronizan al recuperar conexión. El seguimiento en segundo plano depende de permisos y restricciones del sistema y todavía no se validó con pantalla bloqueada en un teléfono real. Build web y sincronización Capacitor de Android/iOS completados; binarios nativos y prueba física siguen pendientes. 150 pruebas automatizadas aprobadas.
 
 Actualización 20/10/2026: función de mediciones publicada en Cloudflare (`8b9db64e-2764-4787-a7c4-74d0a2cee81f`) y migración aplicada en Supabase (`20261020120000`). La aceptación con pantalla bloqueada en Android/iOS sigue pendiente.

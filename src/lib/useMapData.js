@@ -9,19 +9,23 @@ import { useSyncLifecycle } from './useSyncLifecycle';
 export function useMapData({scope,user,userId=user,org,date,historyUser='',isAdmin=false,online}) {
   const live=useRef(true),snapshotData=useRef(null),trackPatchRef=useRef({}),itemPatchRef=useRef({});
   const trackLocks=useRef(new Map());
+  const selection=JSON.stringify([scope,date,userId,isAdmin,historyUser]),generation=useRef({selection,version:0});
+  if(generation.current.selection!==selection)generation.current={selection,version:generation.current.version+1};
   const [error,setError]=useState(''),[syncing,setSyncing]=useState(false),[realtime,setRealtime]=useState('');
   const [trackPatches,setTrackPatches]=useState({}),[itemPatches,setItemPatches]=useState({features:{},publications:{}});
-  const local=useResource(useCallback(async()=>({records:await mapRecords(scope),outbox:await mapOutbox(scope)}),[scope]));
+  const local=useResource(useCallback(async()=>({records:await mapRecords(scope,{date}),outbox:await mapOutbox(scope)}),[scope,date]));
   const snapshot=useResource(useCallback(()=>org ? offlineResource(user,`feed:map:v2:${scope}:${date}:${isAdmin?'admin':userId}:${historyUser}`,()=>loadMap(org,date,userId,isAdmin,historyUser),{offline:!online}) : Promise.resolve({features:[],tracks:[],samples:[],publications:[]}),[scope,user,org,date,userId,isAdmin,historyUser,online]));
   snapshotData.current=snapshot.data;trackPatchRef.current=trackPatches;itemPatchRef.current=itemPatches;
   const refreshTrack=useCallback(id=>{
     if(!id||!org)return Promise.resolve();
-    const existing=trackLocks.current.get(id);
+    const requested=generation.current.version,existing=trackLocks.current.get(id);
     const work=(existing||Promise.resolve()).catch(()=>{}).then(async()=>{
-      const base=snapshotData.current?.tracks?.find(track=>track.id===id);
+      if(generation.current.version!==requested||!live.current)return;
+      const base=snapshotData.current?.samples?.filter(sample=>sample.track_id===id)||[];
       const patch=trackPatchRef.current[id];
-      const lastSeq=Math.max(base?.samples?.at(-1)?.seq??-1,patch?.samples?.at(-1)?.seq??-1);
+      const lastSeq=Math.max(base.at(-1)?.seq??-1,patch?.samples?.at(-1)?.seq??-1);
       const track=await loadMapTrackIncrement(org,id,lastSeq,userId,isAdmin);
+      if(generation.current.version!==requested||!live.current)return;
       setTrackPatches(previous=>{
         if(!track)return {...previous,[id]:{removed:true}};
         const current=previous[id];
@@ -33,9 +37,11 @@ export function useMapData({scope,user,userId=user,org,date,historyUser='',isAdm
     return work.finally(()=>{if(trackLocks.current.get(id)===work)trackLocks.current.delete(id);});
   },[org,userId,isAdmin]);
   const refreshItem=useCallback(async(change)=>{
+    const requested=generation.current.version;
     const table=change?.table,id=(change?.new?.id||change?.old?.id);
     if(!id||!['map_features','posts'].includes(table))return;
     const value=await loadMapItem(table,id,org);
+    if(generation.current.version!==requested||!live.current)return;
     const key=table==='map_features'?'features':'publications';
     setItemPatches(previous=>({...previous,[key]:{...previous[key],[id]:value}}));
   },[org]);

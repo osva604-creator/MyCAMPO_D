@@ -72,3 +72,18 @@ it('stores new upload operations as binary Blobs, retaining byte limits and stab
   expect(mediaBlob(operation.media)).toBe(operation.media);
   expect(()=>mediaBlob(new Blob(['x'],{type:'text/html'}))).toThrow();
 });
+it('does not repopulate a signed-out account cache from a late network response',async()=>{
+  let finish;const loaded=new Promise(resolve=>{finish=resolve;});
+  const request=offlineResource('late-account','feed:private',()=>loaded);
+  await clearReadCache('late-account');
+  finish({posts:[{caption:'Private'}]});await request;
+  navigator.onLine=false;
+  await expect(offlineResource('late-account','feed:private',vi.fn())).rejects.toThrow(/copia/);
+});
+it('bounds non-feed read caches too and keeps standalone binary Blobs intact',async()=>{
+  for(let i=0;i<35;i++)await offlineResource('bounded-directory',`directory:${i}`,async()=>({file:new Blob(['photo'])}));
+  navigator.onLine=false;
+  await expect(offlineResource('bounded-directory','directory:0',vi.fn())).rejects.toThrow(/copia/);
+  const restored=await offlineResource('bounded-directory','directory:34',vi.fn());
+  expect(restored.file).toBeInstanceOf(Blob);expect(await restored.file.text()).toBe('photo');
+});

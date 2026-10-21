@@ -1,12 +1,10 @@
-import { openDB } from 'idb';
+import { openLocalDb,scopeRange } from './indexedDb';
 
-const database = () => openDB('mycampo-d', 1, {
-  upgrade(db) { db.createObjectStore('events', { keyPath: 'key' }); },
-});
+const database = () => openLocalDb('mycampo-d', 1, db => { db.createObjectStore('events', { keyPath: 'key' }); });
 
 export async function readEvents(scope) {
   const db = await database();
-  return (await db.getAll('events')).filter((event) => event.scope === scope);
+  return db.getAll('events',scopeRange(scope));
 }
 
 export async function saveEvent(scope, event) {

@@ -1,22 +1,19 @@
-import { openDB } from "idb";
+import { openLocalDb,matchingRows } from './indexedDb';
 import { contentOperation, executeContent } from "./teamApi";
 import { readEvents } from "./db";
 import { asDataUrl } from './media';
 import { saveLocally } from './offlineStore';
 
 const database = () =>
-  openDB("mycampo-d-team-v2", 1, {
-    upgrade(db) {
+  openLocalDb("mycampo-d-team-v2", 1, db => {
       db.createObjectStore("drafts", { keyPath: "id" });
-    },
   });
 export const revision = (access) =>
   `${access.user_id}:${access.organization_id}:${access.member_id || access.role}`;
 let lastCreatedAt = 0;
 export async function drafts(user, org) {
   const db = await database();
-  return (await db.getAll("drafts"))
-    .filter((d) => d.user_id === user && (!org || d.organization_id === org))
+  return (await matchingRows(db,'drafts',d=>d.user_id===user&&(!org||d.organization_id===org)))
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
 }
 export async function draftPreviews(user, org) {

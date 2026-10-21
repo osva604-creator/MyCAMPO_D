@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
 import { openDB } from 'idb';
 import { beforeEach,expect,it,vi } from 'vitest';
-import { mapScope,mapRecords,mapOutbox,queueMap,syncMap,mergeMap } from '../src/lib/mapStore';
+import { mapScope,mapRecords,mapOutbox,queueMap,syncMap,mergeMap,pruneSyncedMapHistory } from '../src/lib/mapStore';
 const scope='team:user:org:permissions';
 beforeEach(async()=>{
   await mapRecords('init');const db=await openDB('mycampo-d-map-v1',1);const tx=db.transaction(['records','outbox','points'],'readwrite');await Promise.all(['records','outbox','points'].map(s=>tx.objectStore(s).clear()));await tx.done;db.close();
@@ -52,4 +52,25 @@ it('atomically prevents concurrent open tracks across map scopes on one device',
     .rejects.toThrow(/medición abierta de otra cuenta/);
   expect(await mapRecords('team:first')).toHaveLength(1);
   expect(await mapRecords('team:second')).toHaveLength(0);
+});
+it('loads GPS samples only for the selected day while keeping complete backups available',async()=>{
+  const point={seq:0,latitude:-35,longitude:-61,segment:0};
+  for(const [id,started_at] of [['old','2026-10-10T12:00:00Z'],['today','2026-10-21T12:00:00Z']]){
+    await queueMap(scope,'track.samples',{id,samples:[point]},{id,kind:'track',status:'finished',started_at});
+  }
+  const selected=await mapRecords(scope,{date:'2026-10-21'});
+  expect(selected.find(t=>t.id==='old').samples).toEqual([]);
+  expect(selected.find(t=>t.id==='today').samples).toHaveLength(1);
+  expect((await mapRecords(scope)).find(t=>t.id==='old').samples).toHaveLength(1);
+});
+it('expires only old acknowledged finished server copies and retains local or pending records',async()=>{
+  const now=Date.parse('2026-10-21T12:00:00Z'),ended_at='2026-09-01T12:00:00Z';
+  for(const [key,pending,local,status] of [['remote',false,false,'finished'],['pending',true,false,'finished'],['active',false,false,'active'],['local',false,true,'finished']]){
+    const db=await openDB('mycampo-d-map-v1',1);
+    await db.put('records',{key:`${scope}:${key}`,scope,data:{id:key,kind:'track',status,pending,local,ended_at}});
+    await db.put('points',{key:`${scope}:${key}:0`,scope,track_id:key,data:{seq:0}});db.close();
+  }
+  expect(await pruneSyncedMapHistory(scope,now)).toBe(1);
+  const remaining=await mapRecords(scope);expect(remaining.map(r=>r.id).sort()).toEqual(['active','local','pending']);
+  expect(remaining.every(r=>r.samples.length===1)).toBe(true);
 });

@@ -8,9 +8,21 @@ export function useResource(loader, { poll = 0, events = [] } = {}) {
   const cleanup = useRef(null);
   const mounted = useRef(false);
   const dataLoader = useRef(null);
+  const inFlight = useRef(null);
+  const requestedLoader=useRef(loader);requestedLoader.current=loader;
   const eventKey = events.join(",");
-  const reload = useCallback(async () => {
-    if (!mounted.current) return null;
+  const reload = useCallback(({invalidate=true}={}) => {
+    if (!mounted.current) return Promise.resolve(null);
+    if(inFlight.current?.loader===loader){
+      const current=inFlight.current;
+      if(!invalidate)return current.promise;
+      // A successful mutation during an existing read needs one fresh read
+      // afterwards. Focus/online bursts merely share the existing request.
+      current.followup ||= current.promise.then(()=>mounted.current&&requestedLoader.current===loader?reload({invalidate:false}):null);
+      return current.followup;
+    }
+    const entry={loader};
+    const run=async()=>{
     const current = ++sequence.current;
     setBusy(true);
     try {
@@ -37,12 +49,15 @@ export function useResource(loader, { poll = 0, events = [] } = {}) {
     } finally {
       if (mounted.current && current === sequence.current) setBusy(false);
     }
+    };
+    entry.promise=run().finally(()=>{if(inFlight.current===entry)inFlight.current=null;});
+    inFlight.current=entry;return entry.promise;
   }, [loader]);
   useEffect(() => {
     mounted.current = true;
-    reload();
+    reload({invalidate:false});
     const focus = () => {
-      if (navigator.onLine) reload();
+      if (navigator.onLine) reload({invalidate:false});
     };
     window.addEventListener("focus", focus);
     window.addEventListener("online", focus);
@@ -62,12 +77,13 @@ export function useResource(loader, { poll = 0, events = [] } = {}) {
     const timer = poll
       ? setInterval(() => {
           if (navigator.onLine && document.visibilityState !== "hidden")
-            reload();
+            reload({invalidate:false});
         }, poll)
       : null;
     return () => {
       mounted.current = false;
       sequence.current++;
+      inFlight.current=null;
       cleanup.current?.();
       cleanup.current = null;
       clearTimeout(debounce);

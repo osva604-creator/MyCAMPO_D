@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom';
 import { LocateFixed,MapPinned,Plus,Upload,RefreshCw } from 'lucide-react';
 import { useTeam,canManage } from '../../context/TeamContext';
 import { useMapData } from '../../lib/useMapData';
-import { mapScope,queueMap } from '../../lib/mapStore';
+import { mapScope,queueMap,mapRecords } from '../../lib/mapStore';
 import { connectMapTracking,restoreMapTracking } from '../../lib/mapTracking';
-import { validateGeometry,parseGeoJSON,publicationPoint,durationMs,positionIsStale,measurementResult,trackGpsQuality,argentinaDate } from '../../lib/mapGeometry';
+import { validateGeometry,publicationPoint,durationMs,positionIsStale,measurementResult,trackGpsQuality,argentinaDate } from '../../lib/mapGeometry';
 import { isNative } from '../../lib/nativeLocation';
 import { locate,preparePhoto } from '../../lib/media';
 import { mediaBlob } from '../../lib/teamApi';
@@ -14,6 +14,8 @@ import { readForm,saveForm,removeForm,offlineResource } from '../../lib/offlineS
 import { mapPhoto } from '../../lib/mapApi';
 import { useResource } from '../../lib/useResource';
 import MapCanvas from './MapCanvas';
+import MapFeaturePopup from './MapFeaturePopup';
+import { importGisFile,sharePolygon } from '../../lib/mapGis';
 
 const today=()=>argentinaDate(new Date());
 const categories=['incidencia','tranquera','pozo','maquinaria','otro'];
@@ -45,6 +47,7 @@ export default function MapPage({team=null,posts=[],actor={id:'local',name:'Cuen
   const online=network&&(team?.online??true);
   const isAdmin=team?.access.role==='SUPER_ADMIN',historyFilter=isAdmin?historyUser:'';
   const data=useMapData({scope,user,userId:user,org,date,historyUser:historyFilter,isAdmin,online});
+  const [baseLayer,setBaseLayer]=useState('satellite');
   const [layers,setLayers]=useState({parcels:true,points:true,tracks:true});
   const [editor,setEditor]=useState(null),[vertices,setVertices]=useState([]),[drawing,setDrawing]=useState(false),[placing,setPlacing]=useState(false);
   const [preview,setPreview]=useState([]),[selected,setSelected]=useState(null),[center,setCenter]=useState(null),[confirm,setConfirm]=useState(null);
@@ -157,9 +160,9 @@ export default function MapPage({team=null,posts=[],actor={id:'local',name:'Cuen
   }
   async function clearEditor(){await saved.current;await removeForm(formKey);setEditor(null);setVertices([]);setDrawing(false);setPlacing(false);setPreview([]);}
   async function myLocation(point=false){await act(async()=>{const fix=await locate({timeout:30000});if(!mounted.current)return;const geometry={type:'Point',coordinates:[fix.lng,fix.lat]};setCenter({...geometry,nonce:Date.now()});if(point){setEditor(fresh('point',geometry));setPlacing(false);}});}
-  function mapClick(coordinates){if(drawing)setVertices(v=>[...v,coordinates]);else if(placing){setEditor(fresh('point',{type:'Point',coordinates}));setPlacing(false);}}
+  function mapClick(coordinates){if(drawing)setVertices(v=>v.length<500?[...v,coordinates]:v);else if(placing){setEditor(fresh('point',{type:'Point',coordinates}));setPlacing(false);}}
   function updateVertex(index,coordinates){setVertices(previous=>{const next=previous.map((p,i)=>i===index?coordinates:p);if(!drawing)setEditor(e=>({...e,geometry:{type:'Polygon',coordinates:[[...next,next[0]]]}}));return next;});}
-  function finishDrawing(){void act(async()=>{const geometry={type:'Polygon',coordinates:[[...vertices,vertices[0]]]};validateGeometry(geometry);setEditor(e=>({...e,geometry}));setDrawing(false);});}
+  function finishDrawing(){void act(async()=>{const geometry={type:'Polygon',coordinates:[[...vertices,vertices[0]]]};const area_ha=validateGeometry(geometry);setEditor(e=>({...e,geometry,area_ha}));setDrawing(false);setNotice(`Polígono cerrado · ${area_ha.toFixed(2)} ha. Asignale un nombre para guardarlo.`);});}
   async function persist(record) {
     const geometry=record.geometry,area_ha=validateGeometry(geometry);
     if(!record.name.trim())throw new Error('Indicá el nombre o título.');
@@ -178,18 +181,23 @@ export default function MapPage({team=null,posts=[],actor={id:'local',name:'Cuen
     setSelected(null);setConfirm(null);setNotice('Eliminación guardada; los cambios del equipo se sincronizan al recuperar conexión.');
   });}
   async function importFile(file){if(!file)return;await act(async()=>{
-    if(file.size>2*1024*1024)throw new Error('El GeoJSON supera 2 MB.');
-    const items=parseGeoJSON(await file.text());
+    const items=await importGisFile(file);
     if(items.some(item=>item.kind==='parcel')&&!manages(teamId))throw new Error('Tu rol no permite importar lotes para este equipo.');
     setPreview(items.map(item=>({...item,id:crypto.randomUUID()})));setEditor({...fresh('parcel'),name:'Lotes importados'});setVertices([]);setDrawing(false);
   });}
+  async function share(feature){await act(async()=>{const result=await sharePolygon(feature);if(result==='downloaded')setNotice('KMZ descargado. Adjuntalo como documento en WhatsApp.');});}
   function saveImport(){void act(async()=>{
     // Each successful item is removed from the preview so a retry cannot duplicate it.
-    for(const item of preview){await persist({...editor,...item,id:item.id||crypto.randomUUID(),version:null});setPreview(previous=>previous.filter(p=>p!==item));}
+    for(const item of preview){
+      const description=[editor.description,item.description].filter(Boolean).join('\n');
+      if(description.length>3000)throw new Error('La descripción y los atributos GIS superan 3000 caracteres. Acortá la descripción común.');
+      await persist({...editor,...item,description,id:item.id||crypto.randomUUID(),version:null});setPreview(previous=>previous.filter(p=>p!==item));
+    }
     await clearEditor();setNotice('Importación guardada. Los pendientes se sincronizan sin duplicar elementos.');
   });}
   const editorField=(key,value)=>setEditor(e=>({...e,[key]:value}));
-  const selectedLive=selected?.kind==='track'?data.tracks.find(t=>t.id===selected.id)||selected:selected;
+  const selectedLive=selected?.kind==='track'?data.tracks.find(t=>t.id===selected.id)||selected:
+    ['parcel','point'].includes(selected?.kind)?data.features.find(f=>f.id===selected.id)||null:selected;
   const visibleTracks=data.tracks;
   const canEdit=selected&&selected.kind!=='publication'&&selected.kind!=='track'&&(manages(selected.team_id)||(selected.kind==='point'&&selected.author_id===user));
   const active=current&&current.status!=='finished';
@@ -210,10 +218,10 @@ export default function MapPage({team=null,posts=[],actor={id:'local',name:'Cuen
         <button className="btn-secondary" disabled={!permitted||busy||!!editor} onClick={()=>{setPlacing(true);setNotice('Tocá el mapa para elegir la ubicación del nuevo punto.');}}><Plus size={17}/>Nuevo punto</button>
         <button className="btn-secondary" disabled={!permitted||busy||!!editor} onClick={()=>myLocation(true)}>Punto en mi ubicación</button>
         <button className="btn-secondary" disabled={!permitted||!manages(teamId)||busy||!!editor} onClick={()=>{setEditor(fresh('parcel'));setVertices([]);setDrawing(true);setPlacing(false);}}>Dibujar lote</button>
-        <label className={`btn-secondary ${!permitted||!!editor?'opacity-40':''}`}><Upload size={17}/>Importar GeoJSON<input aria-label="Importar GeoJSON" type="file" accept=".geojson,.json,application/geo+json,application/json" className="sr-only" disabled={!permitted||busy||!!editor} onChange={event=>{const file=event.target.files?.[0];event.target.value='';void importFile(file);}}/></label>
+        <label className={`btn-secondary ${!permitted||!!editor?'opacity-40':''}`}><Upload size={17}/>Importar GIS<input aria-label="Importar GIS" type="file" accept=".geojson,.json,.kml,.kmz,.zip,.shp" className="sr-only" disabled={!permitted||busy||!!editor} onChange={event=>{const file=event.target.files?.[0];event.target.value='';void importFile(file);}}/></label>
         {placing&&<button className="btn-secondary" onClick={()=>setPlacing(false)}>Cancelar nuevo punto</button>}
       </div>
-      <fieldset className="flex flex-wrap gap-4 text-sm"><legend className="mb-2 font-semibold">Capas</legend>{[['parcels','Lotes'],['points','Puntos y publicaciones'],['tracks','Recorridos']].map(([key,label])=><label key={key} className="flex min-h-11 items-center gap-2"><input type="checkbox" checked={layers[key]} onChange={e=>setLayers(v=>({...v,[key]:e.target.checked}))}/>{label}</label>)}</fieldset>
+      <p className="text-xs text-stone-500">GIS: GeoJSON, KML, KMZ o Shapefile ZIP con .shp, .dbf, .shx y .prj. Hasta 10 MB, 100 elementos y 500 vértices por polígono simple sin huecos.</p>
     </div>
     <section className="panel" aria-label="Registro de recorridos"><h2 className="text-lg font-bold">Recorridos</h2>
       <p className="mt-2 text-sm text-stone-600">{isNative()?'En Android/iOS puede continuar en segundo plano si el sistema y los permisos lo permiten; no se garantiza continuidad tras cierre forzado.':'En web/PWA el sistema puede suspender la ubicación en segundo plano; no se garantiza seguimiento continuo.'} Al iniciar se registra la ubicación del dispositivo y el SUPER_ADMIN puede consultar el historial dentro del alcance autorizado.</p>
@@ -248,8 +256,12 @@ export default function MapPage({team=null,posts=[],actor={id:'local',name:'Cuen
       <p className="mt-2 text-xs text-stone-500">Resultado estimado; no sustituye una mensura.</p>
       {resultTrack.measurement_type==='perimeter'&&resultTrack.result_geometry&&manages(resultTrack.team_id)&&<button className="btn-secondary mt-3" disabled={busy||Boolean(editor)} onClick={()=>{const geometry=resultTrack.result_geometry;setEditor({...fresh('parcel',geometry),name:`Lote medido ${argentinaDate(resultTrack.started_at)}`});setVertices(geometry.coordinates[0].slice(0,-1));setDrawing(false);setSelected(null);}}>Guardar perímetro como lote</button>}
     </section>}
-    <MapCanvas features={data.features} publications={publications} tracks={visibleTracks} layers={layers} preview={mapPreview} vertices={vertices} drawing={drawing} editable={Boolean(editor?.geometry&&editor.kind==='parcel')} onVertex={updateVertex} onClick={mapClick} onSelect={setSelected} center={center}/>
-    {drawing&&<div className="panel" role="status"><p>Tocá el mapa para agregar vértices. Podés arrastrarlos para ajustarlos. {vertices.length}/500 vértices.</p><div className="mt-3 flex gap-2"><button className="btn-secondary" disabled={!vertices.length} onClick={()=>setVertices(v=>v.slice(0,-1))}>Deshacer vértice</button><button className="btn-primary" disabled={vertices.length<3||busy} onClick={finishDrawing}>Cerrar polígono</button></div></div>}
+    <div className="map-workspace">
+    <div className="map-layer-picker"><label>Mapa base<select aria-label="Mapa base" value={baseLayer} onChange={event=>setBaseLayer(event.target.value)}><option value="satellite">Satélite</option><option value="terrain">Calles y relieve</option></select></label><details><summary>Capas visibles</summary><div>{[['parcels','Lotes'],['points','Puntos y publicaciones'],['tracks','Recorridos']].map(([key,label])=><label key={key}><input type="checkbox" checked={layers[key]} onChange={event=>setLayers(value=>({...value,[key]:event.target.checked}))}/>{label}</label>)}</div></details></div>
+    <MapCanvas baseLayer={baseLayer} onClosePolygon={finishDrawing} features={data.features} publications={publications} tracks={visibleTracks} layers={layers} preview={mapPreview} vertices={vertices} drawing={drawing} editable={Boolean(editor?.geometry&&editor.kind==='parcel')} onVertex={updateVertex} onClick={mapClick} onSelect={setSelected} center={center}/>
+    <MapFeaturePopup feature={selectedLive?.kind==='parcel'?selectedLive:null} onClose={()=>setSelected(null)} onEdit={canEdit&&!editor?edit:null} onDelete={canEdit?setConfirm:null} onShare={share} busy={busy} responsibleName={selectedLive?.responsible_id?name(selectedLive.responsible_id):null}/>
+    </div>
+    {drawing&&<div className="panel" role="status"><p>Tocá el mapa para agregar vértices. Podés arrastrarlos para ajustarlos. Tocá el primer vértice verde para cerrar y calcular las hectáreas. {vertices.length}/500 vértices.</p><div className="mt-3 flex gap-2"><button className="btn-secondary" disabled={!vertices.length} onClick={()=>setVertices(v=>v.slice(0,-1))}>Deshacer vértice</button><button className="btn-primary" disabled={vertices.length<3||busy} onClick={finishDrawing}>Cerrar polígono</button></div></div>}
     {editor&&<form className="panel space-y-3" onSubmit={saveEditor} aria-label="Ficha del mapa">
       <h2 className="text-lg font-bold">{preview.length?'Vista previa de importación':editor.kind==='parcel'?'Ficha del lote':'Ficha del punto'}</h2>
       {preview.length?<><p className="text-sm">Revisá las geometrías en naranja. No se guardan hasta confirmar. La ficha común se aplicará a todos; podés editar cada elemento después.</p><ul className="max-h-56 overflow-auto space-y-2">{preview.map((item,index)=><li key={index} className="flex flex-wrap items-center gap-2"><label className="form-label flex-1">Nombre {index+1}<input className="form-input" required maxLength={120} value={item.name} onChange={e=>setPreview(p=>p.map((f,i)=>i===index?{...f,name:e.target.value}:f))}/></label><span className="text-sm">{item.kind==='parcel'?`${item.area_ha.toFixed(2)} ha`:'Punto'}</span></li>)}</ul></>:
@@ -261,17 +273,16 @@ export default function MapPage({team=null,posts=[],actor={id:'local',name:'Cuen
       <div className="flex flex-wrap gap-2">{preview.length?<button type="button" className="btn-primary" disabled={busy} onClick={saveImport}>Confirmar importación ({preview.length})</button>:<button className="btn-primary" disabled={busy||drawing||!editor.geometry}>Guardar {editor.kind==='parcel'?'lote':'punto'}</button>}<button type="button" className="btn-secondary" disabled={busy} onClick={()=>act(clearEditor)}>Cancelar edición</button></div>
       <p className="text-xs text-stone-500">Borrador guardado en este dispositivo. Las superficies son estimadas; no sustituyen una mensura.</p>
     </form>}
-    {selectedLive&&<section className="panel" aria-label="Detalle del elemento"><div className="flex justify-between gap-3"><h2 className="text-lg font-bold">{selectedLive.name||selectedLive.body||'Recorrido'}</h2><button className="btn-secondary" onClick={()=>setSelected(null)}>Cerrar ficha</button></div>
+    {selectedLive&&selectedLive.kind!=='parcel'&&<section className="panel" aria-label="Detalle del elemento"><div className="flex justify-between gap-3"><h2 className="text-lg font-bold">{selectedLive.name||selectedLive.body||'Recorrido'}</h2><button className="btn-secondary" onClick={()=>setSelected(null)}>Cerrar ficha</button></div>
       <p className="mt-2 whitespace-pre-wrap text-sm">{selectedLive.description}</p>
-      {selectedLive.kind==='parcel'&&<p className="mt-2 text-sm">{selectedLive.area_ha.toFixed(2)} ha · {selectedLive.crop||'Sin cultivo'} · {selectedLive.season||'Sin campaña'} · Responsable: {selectedLive.responsible_id?name(selectedLive.responsible_id):'Sin asignar'}</p>}
       {selectedLive.kind==='point'&&<><p className="mt-2 text-sm">{selectedLive.category} · {selectedLive.geometry.coordinates.join(', ')} · {name(selectedLive.author_id)} · {fmt(selectedLive.created_at)}</p><Photo feature={selectedLive} scope={scope} user={user} online={online}/></>}
       {selectedLive.kind==='publication'&&(local?<button className="btn-primary mt-3" onClick={()=>onOpenPost?.(selectedLive.id)}>Abrir publicación original</button>:<Link className="btn-primary mt-3" to={`/dashboard#publicacion-${selectedLive.id}`}>Abrir publicación original</Link>)}
       {selectedLive.kind==='track'&&<><p className="mt-2 text-sm">{name(selectedLive.user_id)} · {fmt(selectedLive.started_at)} · {selectedLive.status} · {selectedLive.measurement_type==='labor'?'Labor':selectedLive.measurement_type==='perimeter'?'Perímetro':'Recorrido anterior'}</p><TrackStats track={selectedLive}/>{selectedLive.result_area_ha!=null&&<p className="mt-2 text-sm">Área estimada: {selectedLive.result_area_ha.toFixed(2)} ha</p>}{selectedLive.user_id===user&&selectedLive.status==='paused'&&(!active||current.id===selectedLive.id)&&<button className="btn-primary mt-3" disabled={busy} onClick={()=>act(()=>recorder.current.resume(selectedLive))}>Reanudar medición</button>}</>}
       <div className="mt-3 flex flex-wrap gap-2">{canEdit&&<button className="btn-secondary" disabled={busy||!!editor} onClick={()=>edit(selectedLive)}>Editar ficha y geometría</button>}{(canEdit||(selectedLive.kind==='track'&&selectedLive.user_id===user&&selectedLive.status==='finished'))&&<button className="btn-secondary" onClick={()=>setConfirm(selectedLive)}>Eliminar</button>}</div>
     </section>}
     {confirm&&<section className="panel border-red-200" role="alertdialog" aria-label="Confirmar eliminación"><p>¿Eliminar {confirm.name||'este recorrido'}? Se quitará del mapa compartido al sincronizar.</p><div className="mt-3 flex gap-2"><button className="btn-primary" disabled={busy} onClick={remove}>Confirmar eliminación</button><button className="btn-secondary" onClick={()=>setConfirm(null)}>Conservar</button></div></section>}
-    <section className="panel"><h2 className="text-lg font-bold">Lotes y puntos</h2>{!data.features.length&&!publications.length?<p className="mt-3 text-sm text-stone-500">No hay lotes, puntos ni publicaciones con coordenadas válidas para mostrar.</p>:<ul className="mt-3 grid gap-2 sm:grid-cols-2">{data.features.map(f=><li key={f.id}><button className="flex min-h-11 w-full items-center gap-2 rounded-xl border p-3 text-left text-sm" onClick={()=>{setSelected(f);const p=f.geometry.type==='Point'?f.geometry.coordinates:f.geometry.coordinates[0][0];setCenter({coordinates:p,nonce:Date.now()});}}><span className="size-3 shrink-0 rounded-full" style={{background:f.color}}/>{f.name} · {f.pending?'Pendiente':local?'Solo local':'Sincronizado'}</button></li>)}{publications.map(p=><li key={`post:${p.id}`}><button className="min-h-11 w-full rounded-xl border p-3 text-left text-sm" onClick={()=>{setSelected({...p,kind:'publication'});setCenter({...publicationPoint(p),nonce:Date.now()});}}>Publicación · {p.body||p.caption}</button></li>)}</ul>}</section>
+    <section className="panel"><h2 className="text-lg font-bold">Lotes y puntos</h2>{!data.features.length&&!publications.length?<p className="mt-3 text-sm text-stone-500">No hay lotes, puntos ni publicaciones con coordenadas válidas para mostrar.</p>:<ul className="mt-3 grid gap-2 sm:grid-cols-2">{data.features.map(f=><li key={f.id}><button className="flex min-h-11 w-full items-center gap-2 rounded-xl border p-3 text-left text-sm" onClick={()=>{setSelected(f);const p=f.geometry.type==='Point'?f.geometry.coordinates:f.geometry.coordinates[0][0];setCenter({coordinates:p,nonce:Date.now()});}}><span className="size-3 shrink-0 rounded-full" style={{background:f.color}}/>{f.name}{f.kind==='parcel'?` · ${Number(f.area_ha||0).toFixed(2)} ha`:''} · {f.pending?'Pendiente':local?'Solo local':'Sincronizado'}</button></li>)}{publications.map(p=><li key={`post:${p.id}`}><button className="min-h-11 w-full rounded-xl border p-3 text-left text-sm" onClick={()=>{setSelected({...p,kind:'publication'});setCenter({...publicationPoint(p),nonce:Date.now()});}}>Publicación · {p.body||p.caption}</button></li>)}</ul>}</section>
     <section className="panel"><h2 className="text-lg font-bold">Historial de recorridos</h2><div className="mt-3 flex flex-wrap gap-3"><label className="form-label">Fecha<input type="date" className="form-input" value={date} onChange={e=>{if(e.target.value)setDate(e.target.value);}}/></label>{isAdmin&&<label className="form-label">Usuario<select className="form-input" value={historyUser} onChange={e=>setHistoryUser(e.target.value)}><option value="">Todos los usuarios autorizados</option>{people.map(p=><option key={p.user_id} value={p.user_id}>{p.name}</option>)}</select></label>}</div><ul className="mt-3 space-y-2">{visibleTracks.map(t=><li key={t.id}><button className="min-h-11 w-full rounded-xl border p-3 text-left text-sm" onClick={()=>setSelected(t)}>{name(t.user_id)} · {fmt(t.started_at)} · {t.status==='active'?'Activo':t.status==='paused'?'Pausado':'Finalizado'} · {t.measurement_type==='labor'?'Labor':t.measurement_type==='perimeter'?'Perímetro':'Recorrido previo'} · {t.pending?'Pendiente':local?'Solo local':'Sincronizado'}</button></li>)}</ul>{!visibleTracks.length&&<p className="mt-3 text-sm text-stone-500">No hay recorridos para esta fecha{isAdmin&&historyUser?' y usuario seleccionado':''}.</p>}</section>
-    <button className="btn-secondary" onClick={()=>act(()=>downloadJson('mycampo-d-mapa.json',{exported_at:new Date().toISOString(),mode:local?'local':'team',organization_id:org,records:data.records,features:data.features,tracks:visibleTracks}))}>Exportar respaldo del mapa</button>
+    <button className="btn-secondary" onClick={()=>act(async()=>downloadJson('mycampo-d-mapa.json',{exported_at:new Date().toISOString(),mode:local?'local':'team',organization_id:org,records:await mapRecords(scope),features:data.features,tracks:visibleTracks}))}>Exportar respaldo del mapa</button>
   </section>;
 }

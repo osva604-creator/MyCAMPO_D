@@ -1,10 +1,14 @@
 import { useCallback, useState } from 'react';
 import { useResource } from '../lib/useResource';
 import { clearReadCache, protectStorage, storageStatus } from '../lib/offlineStore';
+import { mapStorageStatus } from '../lib/mapStore';
 
 const amount = bytes => `${((bytes || 0) / 1024 / 1024).toLocaleString('es-AR', { maximumFractionDigits: 1 })} MB`;
 export default function StoragePanel({ user, pending = 0 }) {
-  const resource = useResource(useCallback(() => storageStatus(user), [user]));
+  const resource = useResource(useCallback(async() => {
+    const [storage,map]=await Promise.all([storageStatus(user),mapStorageStatus(user)]);
+    return {...storage,map};
+  }, [user]));
   const [notice, setNotice] = useState(''), [busy, setBusy] = useState(false);
   const data = resource.data;
   async function run(action) {
@@ -21,11 +25,13 @@ export default function StoragePanel({ user, pending = 0 }) {
       <div><dt className="text-stone-500">Disponible para la app</dt><dd className="font-semibold">{data?.quota == null ? 'Según el dispositivo' : amount(Math.max(0, data.quota - (data.usage || 0)))}</dd></div>
       <div><dt className="text-stone-500">Copias descargadas</dt><dd className="font-semibold">{amount(data?.cachedBytes)}</dd></div>
       <div><dt className="text-stone-500">Publicaciones y cambios pendientes</dt><dd className="font-semibold">{pending}</dd></div>
+      <div><dt className="text-stone-500">Operaciones del mapa pendientes</dt><dd className="font-semibold">{data?.map.pending??'Consultando…'}</dd></div>
+      <div><dt className="text-stone-500">Posiciones GPS guardadas</dt><dd className="font-semibold">{data?.map.samples??'Consultando…'}</dd></div>
     </dl>
     <p className="mt-3 text-xs text-stone-500">{data?.persistent ? 'Almacenamiento persistente concedido por el navegador.' : 'Podés solicitar protección para reducir la eliminación automática de datos por el navegador.'}</p>
     <div className="mt-4 flex flex-wrap gap-3">
       <button className="btn-secondary" disabled={busy || data?.persistent} onClick={() => run(async () => {
-        const granted = await protectStorage();
+        const granted = await protectStorage({force:true});
         setNotice(granted ? 'Protección de almacenamiento activada.' : 'El navegador no concedió almacenamiento persistente. Conservá respaldos de los pendientes.');
       })}>Proteger guardado sin conexión</button>
       <button className="btn-secondary" disabled={busy || !data?.cachedBytes} onClick={() => run(async () => {

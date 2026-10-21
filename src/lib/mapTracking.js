@@ -8,7 +8,10 @@ function ensure({scope:nextScope,context:nextContext}) {
   const current=recorder?.current();
   if(current&&current.status!=='finished'&&current.user_id!==nextContext.user_id)
     throw new Error('Hay una medición activa de otra sesión. Cerrá sesión y recuperá la medición antes de cambiar de usuario.');
-  if(!recorder||current?.status==='finished'||current?.user_id!==nextContext.user_id){
+  // Preserve the recorder while it is idle too: restoration and StrictMode
+  // reconnect before the first track starts. Replacing it then leaves the UI
+  // holding an old recorder and GPS callbacks publishing from the empty one.
+  if(!recorder||current?.status==='finished'||context?.user_id!==nextContext.user_id||(!current&&scope!==nextScope)){
     scope=nextScope;context=nextContext;lastError='';
     recorder=createMapRecorder({scope,context,onChange:publish,onError:error=>{lastError=error;publish(recorder?.current()||null);}});
   }

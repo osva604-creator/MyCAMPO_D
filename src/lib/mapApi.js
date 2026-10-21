@@ -60,9 +60,8 @@ export async function loadMapTrackIncrement(org,id,lastSeq,userId,isAdmin=false)
   const {data:track,error}=await query.maybeSingle();
   if(error)throw new Error('No se pudo actualizar el recorrido. La copia guardada permanece disponible.');
   if(!track)return null;
-  const {data:samples,error:sampleError}=await supabase.from('map_track_samples').select('*').eq('track_id',id).gt('seq',lastSeq).order('seq');
-  if(sampleError)throw new Error('No se pudieron sincronizar los puntos nuevos del recorrido.');
-  return {...track,samples:samples||[]};
+  const samples=await allRows(()=>supabase.from('map_track_samples').select('*').eq('track_id',id).gt('seq',lastSeq).order('seq'));
+  return {...track,samples};
 }
 export async function loadMapItem(table,id,org) {
   if(table==='map_features'){

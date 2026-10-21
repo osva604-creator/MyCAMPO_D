@@ -17,8 +17,18 @@ beforeAll(async()=>{
   await command('track.samples',{...legacyTrack,samples:[{id:crypto.randomUUID(),seq:0,segment:0,latitude:-35,longitude:-61,accuracy:5,recorded_at:started_at}]});
   await f.owner();
   await f.db.exec(await readFile(new URL('../backend/supabase/migrations/20261020120000_map_track_measurements_and_private_access.sql',import.meta.url),'utf8'));
+  await f.db.exec(await readFile(new URL('../backend/supabase/migrations/20261021172928_storage_and_rls_performance.sql',import.meta.url),'utf8'));
+  await f.db.exec(await readFile(new URL('../backend/supabase/migrations/20261021173320_map_track_team_lookup.sql',import.meta.url),'utf8'));
 },30000);
 afterAll(async()=>{await f?.db.close();});
+it('covers foreign keys without opening private command results to clients',async()=>{
+  await f.owner();
+  const missing=await f.query(`select con.conname from pg_constraint con join pg_class c on c.oid=con.conrelid join pg_namespace n on n.oid=c.relnamespace
+    where con.contype='f' and n.nspname='public' and not exists(select 1 from pg_index i where i.indrelid=con.conrelid and i.indisvalid and i.indpred is null and i.indexprs is null and (i.indkey::smallint[])[0:cardinality(con.conkey)-1] @> con.conkey)`);
+  expect(missing.rows).toEqual([]);
+  await f.as(ids.worker);
+  await expect(f.query('select * from campo_private.command_results')).rejects.toThrow(/permission denied/i);
+});
 it('preserves legacy tracks and samples while removing historical shared access',async()=>{
   await f.as(ids.manager);
   expect((await f.query('select id from public.map_tracks where id=$1',[legacyTrack.id])).rows).toHaveLength(0);

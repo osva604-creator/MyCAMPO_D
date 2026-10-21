@@ -58,6 +58,13 @@ export async function allRows(factory) {
     if (page.length < 500) return result;
   }
 }
+async function mapConcurrent(items,limit,load) {
+  const result=new Array(items.length);let next=0;
+  await Promise.all(Array.from({length:Math.min(limit,items.length)},async()=>{
+    while(next<items.length){const index=next++;result[index]=await load(items[index]);}
+  }));
+  return result;
+}
 export async function directory(org) {
   const scoped = (query) => (org ? query.eq("organization_id", org) : query);
   const [people, teams, organizations, assignments, supervisors, workTeams] =
@@ -189,11 +196,11 @@ export async function feed(org, info, page = 0, author = null, target = null) {
   }
   const media = privateMedia();
   try {
-    const hydrated = await Promise.all(
-      [...files, ...commentFiles].map(async (file) => ({
+    const hydrated = await mapConcurrent(
+      [...files, ...commentFiles],4,async (file) => ({
         ...file,
         url: await media.get(file),
-      })),
+      }),
     );
     const name = (user) =>
       info.people.find((p) => p.user_id === user)?.name ||
